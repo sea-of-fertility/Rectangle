@@ -270,6 +270,11 @@ class AccessibilityElement {
     var isHidden: Bool? {
         applicationElement?.wrappedElement.getValue(.hidden) as? Bool
     }
+
+    /// AXTitle of this element (window title for window elements).
+    var title: String? {
+        wrappedElement.getValue(.title) as? String
+    }
     
     var enhancedUserInterface: Bool? {
         get {

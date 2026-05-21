@@ -38377,6 +38377,18 @@
         }
       }
     },
+    "RSW-r0-tfc.title" : {
+      "comment" : "Class = \"NSTextFieldCell\"; title = \"Reveal Stacked Windows\"; ObjectID = \"RSW-r0-tfc\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reveal Stacked Windows"
+          }
+        }
+      }
+    },
     "Ruw-6m-B2m.title" : {
       "comment" : "Class = \"NSMenuItem\"; title = \"Select All\"; ObjectID = \"Ruw-6m-B2m\";",
       "extractionState" : "extracted_with_value",

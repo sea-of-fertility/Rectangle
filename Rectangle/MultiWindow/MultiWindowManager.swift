@@ -28,6 +28,9 @@ class MultiWindowManager {
         case .tileActiveApp:
             tileActiveAppWindowsOnScreen(windowElement: parameters.windowElement)
             return true
+        case .revealStackedWindows:
+            StackedWindowsManager.reveal(windowElement: parameters.windowElement)
+            return true
         default:
             return false
         }

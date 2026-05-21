@@ -34,3 +34,7 @@ build/
 *.dat
 *.dep
 
+## Editor / tooling local
+.claude/
+.vscode/
+
