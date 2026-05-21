@@ -299,6 +299,23 @@ class AccessibilityElement {
             app.activate(options: .activateIgnoringOtherApps)
         }
     }
+
+    /// Performs the standard `AXRaise` action, which lifts this specific
+    /// window above its siblings within the same app. Use this when you need
+    /// to disambiguate between multiple windows of the same app — e.g. the
+    /// focus picker switching to a different Brave window. Returns true on
+    /// success.
+    @discardableResult
+    func raise() -> Bool {
+        return AXUIElementPerformAction(wrappedElement, kAXRaiseAction as CFString) == .success
+    }
+
+    /// Sets AXMain on this window element. Pairs with `raise()` after the
+    /// owning app has been activated to coerce Chromium/Electron apps into
+    /// keeping the picked window as the key/main window.
+    func setMain(_ value: Bool) {
+        windowElement?.wrappedElement.setValue(.main, value)
+    }
 }
 
 extension AccessibilityElement {

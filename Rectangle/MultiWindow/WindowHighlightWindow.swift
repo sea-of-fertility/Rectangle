@@ -10,6 +10,9 @@ import Cocoa
 
 final class WindowHighlightWindow: NSWindow {
 
+    /// Called when the window resigns key status (e.g. user switched apps).
+    var onResignKey: (() -> Void)?
+
     private static let borderWidth: CGFloat = 5
     private static let cornerRadius: CGFloat = 10
     private static let borderColor: NSColor = .controlAccentColor
@@ -49,6 +52,11 @@ final class WindowHighlightWindow: NSWindow {
 
     func dismiss() {
         orderOut(nil)
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        onResignKey?()
     }
 
     private final class OutlineView: NSView {
