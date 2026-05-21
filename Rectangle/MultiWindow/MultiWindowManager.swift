@@ -31,6 +31,9 @@ class MultiWindowManager {
         case .revealStackedWindows:
             StackedWindowsManager.reveal(windowElement: parameters.windowElement)
             return true
+        case .focusWindowPicker:
+            FocusWindowManager.reveal()
+            return true
         default:
             return false
         }

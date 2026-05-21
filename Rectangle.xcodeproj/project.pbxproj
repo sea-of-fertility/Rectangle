@@ -190,6 +190,12 @@
 		FDE8FCE027C2950400EACCAA /* MultiWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE8FCDF27C2950400EACCAA /* MultiWindowManager.swift */; };
 		A1B2C3D40000000000000001 /* StackedWindowsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000002 /* StackedWindowsManager.swift */; };
 		A1B2C3D40000000000000003 /* StackedWindowsPickerWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000004 /* StackedWindowsPickerWindow.swift */; };
+		B2C3D4E50000000000000001 /* FocusWindowGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000002 /* FocusWindowGeometry.swift */; };
+		B2C3D4E50000000000000003 /* FocusWindowVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000004 /* FocusWindowVisibility.swift */; };
+		B2C3D4E50000000000000005 /* FocusWindowGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000006 /* FocusWindowGeometryTests.swift */; };
+		B2C3D4E50000000000000007 /* FocusWindowVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000008 /* FocusWindowVisibilityTests.swift */; };
+		B2C3D4E50000000000000009 /* WindowHighlightWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5000000000000000A /* WindowHighlightWindow.swift */; };
+		B2C3D4E5000000000000000B /* FocusWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5000000000000000C /* FocusWindowManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -408,6 +414,12 @@
 		FEE147786B2CD7350FAFB700 /* BottomLeftSixteenthCalculation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomLeftSixteenthCalculation.swift; sourceTree = "<group>"; };
 		A1B2C3D40000000000000002 /* StackedWindowsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackedWindowsManager.swift; sourceTree = "<group>"; };
 		A1B2C3D40000000000000004 /* StackedWindowsPickerWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackedWindowsPickerWindow.swift; sourceTree = "<group>"; };
+		B2C3D4E50000000000000002 /* FocusWindowGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowGeometry.swift; sourceTree = "<group>"; };
+		B2C3D4E50000000000000004 /* FocusWindowVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowVisibility.swift; sourceTree = "<group>"; };
+		B2C3D4E50000000000000006 /* FocusWindowGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowGeometryTests.swift; sourceTree = "<group>"; };
+		B2C3D4E50000000000000008 /* FocusWindowVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowVisibilityTests.swift; sourceTree = "<group>"; };
+		B2C3D4E5000000000000000A /* WindowHighlightWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowHighlightWindow.swift; sourceTree = "<group>"; };
+		B2C3D4E5000000000000000C /* FocusWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -459,6 +471,10 @@
 				FDE8FCDF27C2950400EACCAA /* MultiWindowManager.swift */,
 				A1B2C3D40000000000000002 /* StackedWindowsManager.swift */,
 				A1B2C3D40000000000000004 /* StackedWindowsPickerWindow.swift */,
+				B2C3D4E50000000000000002 /* FocusWindowGeometry.swift */,
+				B2C3D4E50000000000000004 /* FocusWindowVisibility.swift */,
+				B2C3D4E5000000000000000A /* WindowHighlightWindow.swift */,
+				B2C3D4E5000000000000000C /* FocusWindowManager.swift */,
 			);
 			path = MultiWindow;
 			sourceTree = "<group>";
@@ -710,6 +726,8 @@
 			isa = PBXGroup;
 			children = (
 				9824701F22AF9B7E0037B409 /* RectangleTests.swift */,
+				B2C3D4E50000000000000006 /* FocusWindowGeometryTests.swift */,
+				B2C3D4E50000000000000008 /* FocusWindowVisibilityTests.swift */,
 				9824702122AF9B7E0037B409 /* Info.plist */,
 			);
 			path = RectangleTests;
@@ -1008,6 +1026,10 @@
 				FDE8FCE027C2950400EACCAA /* MultiWindowManager.swift in Sources */,
 				A1B2C3D40000000000000001 /* StackedWindowsManager.swift in Sources */,
 				A1B2C3D40000000000000003 /* StackedWindowsPickerWindow.swift in Sources */,
+				B2C3D4E50000000000000001 /* FocusWindowGeometry.swift in Sources */,
+				B2C3D4E50000000000000003 /* FocusWindowVisibility.swift in Sources */,
+				B2C3D4E50000000000000009 /* WindowHighlightWindow.swift in Sources */,
+				B2C3D4E5000000000000000B /* FocusWindowManager.swift in Sources */,
 				98192DDA270F606C00015E66 /* Debounce.swift in Sources */,
 				D04CE3002781794E00BD47B3 /* TopLeftNinthCalculation.swift in Sources */,
 				9821403122B38A0500ABFB3F /* TopHalfCalculation.swift in Sources */,
@@ -1146,6 +1168,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9824702022AF9B7E0037B409 /* RectangleTests.swift in Sources */,
+				B2C3D4E50000000000000005 /* FocusWindowGeometryTests.swift in Sources */,
+				B2C3D4E50000000000000007 /* FocusWindowVisibilityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -66,6 +66,7 @@ class PrefsViewController: NSViewController {
     @IBOutlet weak var bottomRightSixthShortcutView: MASShortcutView!
 
     @IBOutlet weak var revealStackedWindowsShortcutView: MASShortcutView!
+    @IBOutlet weak var focusWindowPickerShortcutView: MASShortcutView!
 
     @IBOutlet weak var showMoreButton: NSButton!
     @IBOutlet weak var additionalShortcutsStackView: NSStackView!
@@ -115,7 +116,8 @@ class PrefsViewController: NSViewController {
             .bottomLeftSixth: bottomLeftSixthShortcutView,
             .bottomCenterSixth: bottomCenterSixthShortcutView,
             .bottomRightSixth: bottomRightSixthShortcutView,
-            .revealStackedWindows: revealStackedWindowsShortcutView
+            .revealStackedWindows: revealStackedWindowsShortcutView,
+            .focusWindowPicker: focusWindowPickerShortcutView
         ]
         
         for (action, view) in actionsToViews {

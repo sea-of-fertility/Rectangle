@@ -1983,6 +1983,45 @@
                                                                     <real value="3.4028234663852886e+38"/>
                                                                 </customSpacing>
                                                             </stackView>
+                                                            <stackView distribution="fill" orientation="horizontal" alignment="centerY" spacing="18" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="FWP-r0-row">
+                                                                <rect key="frame" x="0" y="-56" width="345" height="19"/>
+                                                                <subviews>
+                                                                    <stackView distribution="fill" orientation="horizontal" alignment="centerY" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="FWP-r0-lbl">
+                                                                        <rect key="frame" x="0.0" y="2" width="167" height="16"/>
+                                                                        <subviews>
+                                                                            <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="FWP-r0-tf1">
+                                                                                <rect key="frame" x="-2" y="0.0" width="142" height="16"/>
+                                                                                <textFieldCell key="cell" lineBreakMode="clipping" alignment="right" title="Focus Window Picker" id="FWP-r0-tfc">
+                                                                                    <font key="font" usesAppearanceFont="YES"/>
+                                                                                    <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                                                                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                                                                </textFieldCell>
+                                                                            </textField>
+                                                                        </subviews>
+                                                                        <visibilityPriorities>
+                                                                            <integer value="1000"/>
+                                                                        </visibilityPriorities>
+                                                                        <customSpacing>
+                                                                            <real value="3.4028234663852886e+38"/>
+                                                                        </customSpacing>
+                                                                    </stackView>
+                                                                    <customView translatesAutoresizingMaskIntoConstraints="NO" id="FWP-r0-msv" customClass="MASShortcutView">
+                                                                        <rect key="frame" x="185" y="0.0" width="160" height="19"/>
+                                                                        <constraints>
+                                                                            <constraint firstAttribute="height" constant="19" id="FWP-r0-ch1"/>
+                                                                            <constraint firstAttribute="width" constant="160" id="FWP-r0-cw1"/>
+                                                                        </constraints>
+                                                                    </customView>
+                                                                </subviews>
+                                                                <visibilityPriorities>
+                                                                    <integer value="1000"/>
+                                                                    <integer value="1000"/>
+                                                                </visibilityPriorities>
+                                                                <customSpacing>
+                                                                    <real value="3.4028234663852886e+38"/>
+                                                                    <real value="3.4028234663852886e+38"/>
+                                                                </customSpacing>
+                                                            </stackView>
                                                         </subviews>
                                                         <visibilityPriorities>
                                                             <integer value="1000"/>
@@ -1999,8 +2038,10 @@
                                                             <integer value="1000"/>
                                                             <integer value="1000"/>
                                                             <integer value="1000"/>
+                                                            <integer value="1000"/>
                                                         </visibilityPriorities>
                                                         <customSpacing>
+                                                            <real value="3.4028234663852886e+38"/>
                                                             <real value="3.4028234663852886e+38"/>
                                                             <real value="3.4028234663852886e+38"/>
                                                             <real value="3.4028234663852886e+38"/>
@@ -2680,6 +2721,7 @@
                         <outlet property="previousDisplayShortcutView" destination="daM-hW-c6u" id="Gdd-dY-wHF"/>
                         <outlet property="restoreShortcutView" destination="lej-Pz-wb0" id="9p0-dP-tKu"/>
                         <outlet property="revealStackedWindowsShortcutView" destination="RSW-r0-msv" id="RSW-r0-out"/>
+                        <outlet property="focusWindowPickerShortcutView" destination="FWP-r0-msv" id="FWP-r0-out"/>
                         <outlet property="rightHalfShortcutView" destination="DJc-yE-qoJ" id="OJZ-8F-b8g"/>
                         <outlet property="secondFourthShortcutView" destination="K1S-Mg-vfI" id="7e4-36-qqr"/>
                         <outlet property="showMoreButton" destination="WPl-J4-Y8A" id="d55-iL-5P6"/>
