@@ -3,18 +3,39 @@
 //  Rectangle
 //
 //  Adds the "Reveal Stacked Windows" action: shows a HUD listing every window
-//  that currently occupies (roughly) the same frame as the front window on the
-//  same display, so the user can pick one to bring forward.
+//  that overlaps the front window enough to be considered stacked underneath
+//  it, so the user can pick one to bring forward.
+//
+//  The overlap rule is D-max: `max(A∩B / area(A), A∩B / area(B)) >= threshold`.
+//  This treats both "same-frame stack" and "small panel half on top of a big
+//  window" as the same kind of relationship, so each is surfaced as a
+//  candidate.
 //
 
 import Cocoa
 
 class StackedWindowsManager {
 
-    /// Tolerance in points for considering two window frames "the same".
-    /// Rectangle gaps and rounding from setFrame() can introduce small
-    /// differences, so a few points of slack is sensible.
-    static let frameMatchTolerance: CGFloat = 4
+    /// Minimum overlap ratio for a window to count as "stacked under" the
+    /// active window. Compared against `overlapRatio` (D-max). 0.25 means
+    /// the candidate must share at least 25% of either its own area or the
+    /// active window's area with the active window.
+    static let overlapThreshold: CGFloat = 0.25
+
+    /// D-max overlap: `max(A∩B / area(A), A∩B / area(B))`.
+    /// Returns 0 when either rect has zero area or they do not intersect.
+    /// Picking the larger of the two ratios lets small floating panels that
+    /// sit half-on-top of a much larger window still register as "stacked",
+    /// while ignoring incidental edge contact.
+    static func overlapRatio(_ a: CGRect, _ b: CGRect) -> CGFloat {
+        let areaA = a.width * a.height
+        let areaB = b.width * b.height
+        guard areaA > 0, areaB > 0 else { return 0 }
+        let inter = a.intersection(b)
+        if inter.isNull || inter.isEmpty { return 0 }
+        let interArea = inter.width * inter.height
+        return max(interArea / areaA, interArea / areaB)
+    }
 
     /// Currently displayed picker, kept alive while visible.
     private static var activePicker: StackedWindowsPickerWindow?
@@ -41,13 +62,11 @@ class StackedWindowsManager {
         let activeFrame = activeWindow.frame
 
         let candidates = collectCandidates(activeWindow: activeWindow,
-                                           activeFrame: activeFrame,
-                                           currentScreen: currentScreen,
-                                           screenDetection: screenDetection)
+                                           activeFrame: activeFrame)
 
         if candidates.isEmpty {
             NSSound.beep()
-            Logger.log("StackedWindows: no other windows share this snap area")
+            Logger.log("StackedWindows: no other windows overlap the active window")
             return
         }
 
@@ -68,19 +87,27 @@ class StackedWindowsManager {
         activePicker = picker
     }
 
-    /// Returns every visible window on `currentScreen` whose frame matches
-    /// `activeFrame` within `frameMatchTolerance`, excluding the active
-    /// window itself.
+    /// Returns every visible window whose frame overlaps `activeFrame` by at
+    /// least `overlapThreshold` (D-max), excluding the active window itself.
+    /// Display membership is not checked — the overlap predicate already
+    /// excludes windows that don't share screen coordinates with the active
+    /// window, and naturally includes windows that straddle a display
+    /// boundary.
     static func collectCandidates(activeWindow: AccessibilityElement,
-                                  activeFrame: CGRect,
-                                  currentScreen: NSScreen,
-                                  screenDetection: ScreenDetection) -> [AccessibilityElement] {
+                                  activeFrame: CGRect) -> [AccessibilityElement] {
 
         let allWindows = AccessibilityElement.getAllWindowElements()
         var result: [AccessibilityElement] = []
 
         for w in allWindows {
+            // AX/CG can surface the same macOS window via different
+            // AccessibilityElement instances (e.g. Chromium helper processes
+            // exposing windows under a non-main pid). The plain `==` ref
+            // check misses those, so also reject by CGWindowID when
+            // available — that's a system-level unique id and won't
+            // accidentally include the active window as its own candidate.
             if w == activeWindow { continue }
+            if let aWid = activeWindow.windowId, w.windowId == aWid { continue }
             if Defaults.todo.userEnabled, TodoManager.isTodoWindow(w) { continue }
             guard w.isWindow == true,
                   w.isSheet != true,
@@ -89,23 +116,10 @@ class StackedWindowsManager {
                   w.isSystemDialog != true
             else { continue }
 
-            // Same display?
-            guard let wScreen = screenDetection.detectScreens(using: w)?.currentScreen,
-                  wScreen == currentScreen
-            else { continue }
-
-            // Same frame (within tolerance)?
-            if framesApproximatelyEqual(w.frame, activeFrame) {
+            if overlapRatio(activeFrame, w.frame) >= overlapThreshold {
                 result.append(w)
             }
         }
         return result
-    }
-
-    private static func framesApproximatelyEqual(_ a: CGRect, _ b: CGRect) -> Bool {
-        return abs(a.origin.x - b.origin.x) <= frameMatchTolerance
-            && abs(a.origin.y - b.origin.y) <= frameMatchTolerance
-            && abs(a.size.width - b.size.width) <= frameMatchTolerance
-            && abs(a.size.height - b.size.height) <= frameMatchTolerance
     }
 }

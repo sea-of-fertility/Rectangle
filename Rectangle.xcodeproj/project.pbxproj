@@ -194,6 +194,7 @@
 		B2C3D4E50000000000000003 /* FocusWindowVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000004 /* FocusWindowVisibility.swift */; };
 		B2C3D4E50000000000000005 /* FocusWindowGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000006 /* FocusWindowGeometryTests.swift */; };
 		B2C3D4E50000000000000007 /* FocusWindowVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000008 /* FocusWindowVisibilityTests.swift */; };
+		B2C3D4E50000000000000050 /* StackedWindowsOverlapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E50000000000000051 /* StackedWindowsOverlapTests.swift */; };
 		B2C3D4E50000000000000009 /* WindowHighlightWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5000000000000000A /* WindowHighlightWindow.swift */; };
 		B2C3D4E5000000000000000B /* FocusWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5000000000000000C /* FocusWindowManager.swift */; };
 /* End PBXBuildFile section */
@@ -418,6 +419,7 @@
 		B2C3D4E50000000000000004 /* FocusWindowVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowVisibility.swift; sourceTree = "<group>"; };
 		B2C3D4E50000000000000006 /* FocusWindowGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowGeometryTests.swift; sourceTree = "<group>"; };
 		B2C3D4E50000000000000008 /* FocusWindowVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowVisibilityTests.swift; sourceTree = "<group>"; };
+		B2C3D4E50000000000000051 /* StackedWindowsOverlapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackedWindowsOverlapTests.swift; sourceTree = "<group>"; };
 		B2C3D4E5000000000000000A /* WindowHighlightWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowHighlightWindow.swift; sourceTree = "<group>"; };
 		B2C3D4E5000000000000000C /* FocusWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWindowManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -728,6 +730,7 @@
 				9824701F22AF9B7E0037B409 /* RectangleTests.swift */,
 				B2C3D4E50000000000000006 /* FocusWindowGeometryTests.swift */,
 				B2C3D4E50000000000000008 /* FocusWindowVisibilityTests.swift */,
+				B2C3D4E50000000000000051 /* StackedWindowsOverlapTests.swift */,
 				9824702122AF9B7E0037B409 /* Info.plist */,
 			);
 			path = RectangleTests;
@@ -1170,6 +1173,7 @@
 				9824702022AF9B7E0037B409 /* RectangleTests.swift in Sources */,
 				B2C3D4E50000000000000005 /* FocusWindowGeometryTests.swift in Sources */,
 				B2C3D4E50000000000000007 /* FocusWindowVisibilityTests.swift in Sources */,
+				B2C3D4E50000000000000050 /* StackedWindowsOverlapTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
