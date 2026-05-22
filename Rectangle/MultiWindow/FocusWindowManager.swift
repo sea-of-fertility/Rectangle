@@ -35,12 +35,23 @@ class FocusWindowManager {
             return
         }
 
+        // Union of every NSScreen's frame, in CGWindowList (top-origin)
+        // coordinates. macOS parks windows from *other* Spaces at large
+        // negative coordinates (e.g. x = -4890), and CGWindowList's
+        // `.optionOnScreenOnly` still returns them — they're "on screen" in
+        // their own Space, just not in ours. We use this rect to filter them
+        // out below.
+        let visibleScreensFrame = NSScreen.screens
+            .map { $0.frame.screenFlipped }
+            .reduce(CGRect.null) { $0.union($1) }
+
         // All visible windows in front-to-back order, filtered to app-level windows.
         let allInfos = WindowUtil.getWindowList().filter { info in
             info.level == 0
                 && !excludedProcessNames.contains(info.processName ?? "")
                 && info.frame.width >= minDimension
                 && info.frame.height >= minDimension
+                && info.frame.intersects(visibleScreensFrame)
         }
 
         let frames = allInfos.map { $0.frame }
