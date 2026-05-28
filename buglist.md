@@ -157,7 +157,7 @@
 
 ---
 
-## [ ] B5. Focus Window Picker로 한 디스플레이의 Chromium 창을 선택하면 다른 디스플레이의 같은 앱 창도 같이 맨 앞으로 올라온다
+## [x] B5. Focus Window Picker로 한 디스플레이의 Chromium 창을 선택하면 다른 디스플레이의 같은 앱 창도 같이 맨 앞으로 올라온다
 
 - **재현 조건**:
   1. 모니터 A, B, C 좌→우 나열.
@@ -201,5 +201,14 @@
     상에서 단일 창 단위로 분리 raise 가 불가능하다고 보고 수용. 비권장.
 - **관련 파일**:
   - `Rectangle/MultiWindow/FocusWindowManager.swift` (`raiseAndActivate`)
-- **상태**: 미해결
+- **상태**: 해결됨 — Carbon-era 비공개 SkyLight 함수
+  `_SLPSSetFrontProcessWithOptions` 로 *특정 wid* 를 지정해 활성화한다.
+  마우스 클릭 경로가 내부적으로 호출하는 동일 API. `SLPSPostEventRecordTo`
+  로 합성 key/focus 이벤트 한 쌍을 더 보내 Chromium/Electron 도 새 main
+  window 로 인식하도록 한다. 비공개 심볼은 dlsym 으로 lazy 로드하므로
+  미래 macOS 가 심볼을 제거하면 기존 `NSRunningApplication.activate` 경로로
+  자동 fallback. 검증: Brave 두 창(모니터 A 가려진 W_A + 모니터 C 보이는 W_C)
+  + System Settings 가 W_A 를 덮은 시나리오에서 W_C 확정 후 *post-raise
+  z-order 가 W_A 와 System Settings 의 상대 순서를 보존*. 참고:
+  [B5-Investigation.md](B5-Investigation.md).
 - **우선순위**: 미정
