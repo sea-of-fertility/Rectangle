@@ -31,6 +31,17 @@ class FocusWindowManager {
     static func reveal() {
         if activeSession != nil { return }   // already running
 
+        // Capture the app that was frontmost *before* we activate Rectangle to
+        // show the picker. On Esc-cancel we restore it as frontmost — otherwise
+        // Rectangle stays frontmost (it has no visible window) and the next
+        // reveal() bails out at getFrontWindowElement() == nil. Skip Rectangle
+        // itself in the unlikely case it was already frontmost.
+        let previousApp: NSRunningApplication? = {
+            guard let app = NSWorkspace.shared.frontmostApplication,
+                  app.processIdentifier != getpid() else { return nil }
+            return app
+        }()
+
         // ---- DIAGNOSTIC (B3 hypothesis A) ----------------------------------
         // Log who macOS considers frontmost at the moment reveal() starts.
         // If this is Rectangle itself after a previous cancel, getFrontWindow
@@ -110,7 +121,9 @@ class FocusWindowManager {
         }
         // ---------------------------------------------------------------------
 
-        let session = Session(candidates: candidateInfos, startIndex: activeIndex)
+        let session = Session(candidates: candidateInfos,
+                              startIndex: activeIndex,
+                              previousApp: previousApp)
         session.start()
         activeSession = session
     }
@@ -202,14 +215,16 @@ class FocusWindowManager {
     private final class Session {
         private let candidates: [WindowInfo]
         private var cursorIndex: Int       // index into `candidates`
+        private let previousApp: NSRunningApplication?
         private let highlight = WindowHighlightWindow()
         private var keyMonitor: Any?
         private var globalClickMonitor: Any?
         private var dismissing = false
 
-        init(candidates: [WindowInfo], startIndex: Int) {
+        init(candidates: [WindowInfo], startIndex: Int, previousApp: NSRunningApplication?) {
             self.candidates = candidates
             self.cursorIndex = startIndex
+            self.previousApp = previousApp
         }
 
         func start() {
@@ -263,6 +278,10 @@ class FocusWindowManager {
             dismissing = true
             removeKeyMonitor()
             highlight.dismiss()
+            // Restore the app that was frontmost before we showed the picker.
+            // Without this, Rectangle stays frontmost and a subsequent reveal()
+            // sees no front window (Rectangle has none) and bails out.
+            previousApp?.activate(options: .activateIgnoringOtherApps)
             FocusWindowManager.sessionEnded()
             // ---- DIAGNOSTIC (B3 hypothesis A) ------------------------------
             // After cancel, who is frontmost? If Rectangle stays frontmost, the

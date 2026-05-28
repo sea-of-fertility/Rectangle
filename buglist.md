@@ -66,7 +66,7 @@
 
 ---
 
-## [ ] B3. Focus Window Picker를 Esc로 취소한 뒤 다시 호출하면 picker가 동작하지 않는다
+## [x] B3. Focus Window Picker를 Esc로 취소한 뒤 다시 호출하면 picker가 동작하지 않는다
 
 - **재현 조건**:
   1. Focus Window Picker 단축키로 picker 호출 (파란 하이라이트 표시)
@@ -96,7 +96,11 @@
 - **관련 파일**:
   - `Rectangle/MultiWindow/FocusWindowManager.swift`
     (특히 `reveal()` 시작점, `Session.cancel()`)
-- **상태**: 미해결
+- **상태**: 해결됨 — 가설 A 확정. `[FW] cancel: post-cancel frontmost
+  app pid=… name=Rectangle` 로 cancel 후 Rectangle 자신이 frontmost 로
+  남는 것이 로그로 검증되었고, 다음 reveal() 이 `getFrontWindowElement()
+  == nil` 분기에서 bailout 되었다. `reveal()` 진입 시 직전 frontmost 앱을
+  캡처하고 `cancel()` 에서 그 앱을 다시 activate 하도록 수정.
 - **우선순위**: 미정
 
 ---
