@@ -31,10 +31,25 @@ class FocusWindowManager {
     static func reveal() {
         if activeSession != nil { return }   // already running
 
+        // ---- DIAGNOSTIC (B3 hypothesis A) ----------------------------------
+        // Log who macOS considers frontmost at the moment reveal() starts.
+        // If this is Rectangle itself after a previous cancel, getFrontWindow
+        // Element() will return nil (we have no visible window) and bail.
+        if let front = NSWorkspace.shared.frontmostApplication {
+            NSLog("[FW] reveal: frontmost app pid=%d bundleId=%@ name=%@",
+                  front.processIdentifier,
+                  front.bundleIdentifier ?? "?",
+                  front.localizedName ?? "?")
+        } else {
+            NSLog("[FW] reveal: NSWorkspace.frontmostApplication is nil")
+        }
+        // --------------------------------------------------------------------
+
         // Active window (we anchor the picker here).
         guard let active = AccessibilityElement.getFrontWindowElement(),
               let activeWindowId = active.windowId else {
             NSSound.beep()
+            NSLog("[FW] reveal: no front window — bailing (likely Rectangle is frontmost)")
             Logger.log("FocusWindow: no front window")
             return
         }
@@ -249,6 +264,20 @@ class FocusWindowManager {
             removeKeyMonitor()
             highlight.dismiss()
             FocusWindowManager.sessionEnded()
+            // ---- DIAGNOSTIC (B3 hypothesis A) ------------------------------
+            // After cancel, who is frontmost? If Rectangle stays frontmost, the
+            // next reveal() will see itself and bail.
+            DispatchQueue.main.async {
+                if let front = NSWorkspace.shared.frontmostApplication {
+                    NSLog("[FW] cancel: post-cancel frontmost app pid=%d bundleId=%@ name=%@",
+                          front.processIdentifier,
+                          front.bundleIdentifier ?? "?",
+                          front.localizedName ?? "?")
+                } else {
+                    NSLog("[FW] cancel: post-cancel frontmost is nil")
+                }
+            }
+            // ----------------------------------------------------------------
         }
 
         private func installKeyMonitor() {

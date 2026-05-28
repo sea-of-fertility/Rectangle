@@ -38,3 +38,6 @@ build/
 .claude/
 .vscode/
 
+## Local debug logs
+log/
+
