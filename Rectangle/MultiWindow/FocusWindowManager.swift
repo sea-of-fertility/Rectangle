@@ -167,6 +167,21 @@ class FocusWindowManager {
             .map { $0.frame.screenFlipped }
             .reduce(CGRect.null) { $0.union($1) }
 
+        // ---- DIAGNOSTIC (B6) -----------------------------------------------
+        // Off-Space windows park at very negative coordinates. The current
+        // filter intersects against the union of all NSScreen frames — if
+        // a parked window's frame still happens to overlap that union, it
+        // sneaks into the candidate list and the picker cursor can land on
+        // an invisible window. Log each NSScreen and the union rect so we
+        // can confirm whether the filter is geometrically capable of
+        // excluding them.
+        NSLog("[FW] reveal: NSScreen.screens (flipped):")
+        for (i, s) in NSScreen.screens.enumerated() {
+            NSLog("[FW]   screen[%d] frame=%@", i, NSStringFromRect(s.frame.screenFlipped))
+        }
+        NSLog("[FW] reveal: visibleScreensFrame=%@", NSStringFromRect(visibleScreensFrame))
+        // --------------------------------------------------------------------
+
         // All visible windows in front-to-back order, filtered to app-level windows.
         let allInfos = WindowUtil.getWindowList().filter { info in
             info.level == 0
