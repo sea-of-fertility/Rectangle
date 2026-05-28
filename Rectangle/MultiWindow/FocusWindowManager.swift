@@ -71,22 +71,33 @@ private enum SkyLightPrivate {
     // MARK: Space filter (B6)
     //
     // CGWindowList.optionOnScreenOnly returns windows from *other* Spaces too —
-    // macOS parks them at very negative coordinates so they intersect the
-    // NSScreen union and slip past a frame-based filter. The picker cursor
-    // can then land on a window that isn't actually on screen.
+    // macOS parks them at very negative coordinates that still fall inside the
+    // NSScreen union, so a frame-based filter can't exclude them. The picker
+    // cursor can then land on a window that isn't actually on screen.
     //
-    // CGSCopySpacesForWindows with mask = kCGSCurrentSpaceMask (5) returns the
-    // current space ID iff the given window belongs to it. Empty array means
-    // the window is on some other space.
+    // The fix is two-step:
+    //   1. Collect every display's *current* active Space ID via
+    //      CGSManagedDisplayGetCurrentSpace.
+    //   2. For each candidate wid, ask CGSCopySpacesForWindows for the Spaces
+    //      it lives on and keep it only if at least one of them is in (1).
     //
-    // Verified usage: alt-tab-macos (SkyLight.framework.swift:150).
+    // Note: the `mask` argument of CGSCopySpacesForWindows controls the result
+    // *array shape*, not "filter". mask=5/6/7 all return the wid's Space IDs;
+    // a non-empty result does NOT mean "on current Space". We have to compare
+    // explicitly against the active-Space set we built ourselves.
+    //
+    // Verified pattern: alt-tab-macos Spaces.swift (display-keyed active-Space
+    // collection) + Window.swift (per-window Space lookup with mask=all).
 
     typealias CGSConnectionID = UInt32
+    typealias CGSSpaceID = UInt64
     typealias CGSMainConnectionIDFn = @convention(c) () -> CGSConnectionID
     typealias CGSCopySpacesForWindowsFn =
         @convention(c) (CGSConnectionID, Int32, CFArray) -> CFArray?
+    typealias CGSManagedDisplayGetCurrentSpaceFn =
+        @convention(c) (CGSConnectionID, CFString) -> CGSSpaceID
 
-    static let kCGSCurrentSpaceMask: Int32 = 5
+    static let kCGSAllSpacesMask: Int32 = 7
 
     static let cgsMainConnectionID: CGSMainConnectionIDFn? = {
         guard let sym = dlsym(handle, "CGSMainConnectionID") else { return nil }
@@ -98,24 +109,51 @@ private enum SkyLightPrivate {
         return unsafeBitCast(sym, to: CGSCopySpacesForWindowsFn.self)
     }()
 
-    /// Returns the set of window IDs (from `ids`) that live on the current
-    /// active Space. If the private API is unavailable, returns the input
-    /// unchanged — i.e. fall back to no filtering.
+    static let getCurrentSpaceForDisplay: CGSManagedDisplayGetCurrentSpaceFn? = {
+        guard let sym = dlsym(handle, "CGSManagedDisplayGetCurrentSpace") else { return nil }
+        return unsafeBitCast(sym, to: CGSManagedDisplayGetCurrentSpaceFn.self)
+    }()
+
+    /// Returns the set of currently active Space IDs across all connected
+    /// displays. Each display can host its own active Space (multi-Space
+    /// arrangement), so we union them.
+    static func currentSpaceIds() -> Set<CGSSpaceID> {
+        guard let connID = cgsMainConnectionID,
+              let getSpace = getCurrentSpaceForDisplay else { return [] }
+        let cid = connID()
+        var result = Set<CGSSpaceID>()
+        for screen in NSScreen.screens {
+            // NSScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")]
+            // gives the CGDirectDisplayID; CGSManagedDisplayGetCurrentSpace
+            // takes the display *UUID* as CFString.
+            let key = NSDeviceDescriptionKey("NSScreenNumber")
+            guard let nsNum = screen.deviceDescription[key] as? NSNumber else { continue }
+            let displayID = CGDirectDisplayID(nsNum.uint32Value)
+            guard let uuidRef = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { continue }
+            let uuidStr = CFUUIDCreateString(nil, uuidRef)!
+            let spaceId = getSpace(cid, uuidStr as CFString)
+            if spaceId != 0 { result.insert(spaceId) }
+        }
+        return result
+    }
+
+    /// Returns the subset of `ids` that live on one of the currently active
+    /// Spaces. If the private API is unavailable, returns the input set
+    /// unchanged (no filtering).
     static func filterToCurrentSpace(_ ids: [CGWindowID]) -> Set<CGWindowID> {
         guard let connID = cgsMainConnectionID,
               let copySpaces = copySpacesForWindows,
               !ids.isEmpty else {
             return Set(ids)
         }
+        let activeSpaces = currentSpaceIds()
+        guard !activeSpaces.isEmpty else { return Set(ids) }
         let cid = connID()
         var onCurrent = Set<CGWindowID>()
-        // One call per wid keeps the result simple — current space is either
-        // empty (other space) or non-empty (current space). A batched call
-        // would be faster but returns a flattened array that's awkward to map
-        // back to specific wids.
         for wid in ids {
-            let result = copySpaces(cid, kCGSCurrentSpaceMask, [wid] as CFArray)
-            if let arr = result as? [Any], !arr.isEmpty {
+            let result = copySpaces(cid, kCGSAllSpacesMask, [wid] as CFArray)
+            guard let arr = result as? [CGSSpaceID] else { continue }
+            if arr.contains(where: { activeSpaces.contains($0) }) {
                 onCurrent.insert(wid)
             }
         }
