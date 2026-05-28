@@ -146,3 +146,52 @@
   - `Rectangle/MultiWindow/FocusWindowManager.swift` (`raiseAndActivate` 참고)
 - **상태**: 미해결
 - **우선순위**: 미정
+
+---
+
+## [ ] B5. Focus Window Picker로 한 디스플레이의 Chromium 창을 선택하면 다른 디스플레이의 같은 앱 창도 같이 맨 앞으로 올라온다
+
+- **재현 조건**:
+  1. 모니터 A, B, C 좌→우 나열.
+  2. 모니터 A 에 Brave(또는 Chrome / Slack / VS Code 등 Chromium 계열) 창
+     `W_A` 가 있고, 그 위를 *다른 앱*(예: 시스템 설정 창)이 덮고 있어
+     `W_A` 가 z-order 상 가려진 상태.
+  3. 모니터 C 에 같은 앱의 다른 창 `W_C` 가 보이고 있음.
+  4. Focus Window Picker 로 `W_C` 를 지목/확정.
+- **관찰된 동작**: `W_C` 가 활성화되는 건 맞다. 그런데 같은 시점에 모니터 A
+  에서도 `W_A` 가 z-order 위로 올라와, 원래 `W_A` 를 덮고 있던 다른 앱의
+  창이 가려진다. 즉 picker 가 지목한 wid 하나만 raise 한 게 아니라 같은
+  앱의 *다른* 창까지 같이 raise 됨.
+- **기대 동작**: 모니터 A 의 z-order 는 picker 이전과 동일하게 유지되어야
+  한다 (W_A 는 원래대로 다른 앱 창 뒤에 남아 있어야 함). picker 가 지목한
+  `W_C` 만 활성화된다.
+- **원인 추정**:
+  - `FocusWindowManager.raiseAndActivate(_:)` 의 시퀀스 중
+    `NSRunningApplication.activate(options: .activateIgnoringOtherApps)`
+    호출은 macOS 표준 동작상 **해당 앱의 모든 창을 다른 앱 창들 위로**
+    올린다. 그래서 W_A 가 (다른 앱이 덮고 있던 자리에서) 같이 위로 떠오름.
+  - 그 뒤의 `target.raise()` 는 같은 앱 내 z-order 만 정리하므로 다른
+    디스플레이에 있는 W_A 까지 원래 자리로 되돌리지 않는다.
+  - 이 동작은 Chromium / Electron / JetBrains 처럼 *앱 = 멀티창 묶음* 으로
+    취급하는 앱 모델과 macOS activate 의 "앱 단위 promote" 의미가 결합되어
+    나타나는 구조적 문제. B2 (잘못된 창 활성화)와 다르고, B4 (가려진 같은 앱
+    창이 *대신* 활성화)와도 다른 별개 케이스다.
+- **확인 필요**: picker 확정 직전 / 직후의 z-order 변화를 로그로 검증.
+  `[FW] confirm: chosen wid=...` 와 raise 전·후 모든 Brave 창의 z-index
+  (CGWindowList 의 front-to-back 순서) 변화 비교.
+- **수정 방향 (선택지)**:
+  - **A. activate 를 회피하고 AX 만으로 raise** — `runningApp.activate(...)`
+    를 호출하지 않고 `target.raise()` + `target.setMain(true)` + 키 윈도우
+    설정만 시도. 단, Chromium 은 activate 없이는 frontmost 가 안 바뀔 수
+    있어 회귀 위험 큼.
+  - **B. activate 후 같은 앱의 다른 창을 원래 z-order 로 되돌리기** —
+    confirm 직전 동일 PID 의 다른 창 wid 와 그 z-index 를 캡처해 두고,
+    activate/raise 후 그 창들을 원래 위에 있던 다른 앱 창 아래로 다시
+    내려보낸다. AX 에는 "send to back" 이 표준으로 없으므로 우회 필요
+    (예: 가렸던 앱을 잠깐 raise 해서 z-order 회복).
+  - **C. macOS 한계 인정 — 동작 문서화** — Chromium 앱의 멀티창은 macOS
+    상에서 단일 창 단위로 분리 raise 가 불가능하다고 보고 수용. 비권장.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowManager.swift` (`raiseAndActivate`)
+- **상태**: 미해결
+- **우선순위**: 미정
