@@ -24,6 +24,10 @@ class FocusWindowManager {
 
     private static var activeSession: Session?
 
+    static var isActive: Bool {
+        activeSession != nil
+    }
+
     static func reveal() {
         if activeSession != nil { return }   // already running
 

@@ -4,7 +4,7 @@
 
 ---
 
-## [ ] B1. Focus Window Picker 동작 중 Reveal Stacked Windows를 실행하면 파란 테두리만 남는다
+## [x] B1. Focus Window Picker 동작 중 Reveal Stacked Windows를 실행하면 파란 테두리만 남는다
 
 - **재현 조건**: Focus Window Picker가 활성화된 상태(파란 하이라이트 표시 중)에서
   Reveal Stacked Windows 액션을 호출.
@@ -28,7 +28,11 @@
   - `Rectangle/MultiWindow/WindowHighlightWindow.swift`
   - `Rectangle/MultiWindow/StackedWindowsManager.swift`
   - `Rectangle/MultiWindow/MultiWindowManager.swift`
-- **상태**: 미해결
+- **해결 방식**: 기대 동작 (b) 채택 — `MultiWindowManager.handleMultiWindow`에서
+  두 picker 간 상호 배타 처리 추가. 다른 picker 활성 시 `NSSound.beep()` + 로그
+  후 무시. `FocusWindowManager.isActive` / `StackedWindowsManager.isActive`
+  정적 프로퍼티 신설.
+- **상태**: 해결 완료 (Debug 빌드 수동 재현 검증 통과)
 - **우선순위**: 미정
 
 ---

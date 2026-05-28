@@ -40,6 +40,10 @@ class StackedWindowsManager {
     /// Currently displayed picker, kept alive while visible.
     private static var activePicker: StackedWindowsPickerWindow?
 
+    static var isActive: Bool {
+        activePicker?.isVisible == true
+    }
+
     static func reveal(windowElement passedWindow: AccessibilityElement? = nil) {
         // If a picker is already up, treat the second invocation as a "next"
         // action (advance selection) instead of opening another one.
