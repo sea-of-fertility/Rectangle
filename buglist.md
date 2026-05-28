@@ -212,3 +212,46 @@
   z-order 가 W_A 와 System Settings 의 상대 순서를 보존*. 참고:
   [B5-Investigation.md](B5-Investigation.md).
 - **우선순위**: 미정
+
+---
+
+## [ ] B6. Picker 의 파란 사각형이 화면에 보이지 않는(다른 창에 가려진) 창을 가리키고 확정 시 그 창이 활성화된다
+
+- **재현 조건**:
+  1. 화면 어느 영역에 앞쪽 창 `F` (예: Claude 데스크탑 앱) 가 떠 있어 그
+     아래의 다른 창 `B` (예: Brave 또는 다른 앱) 를 z-order 상 *완전히*
+     또는 *대부분* 가리고 있다.
+  2. Focus Window Picker 호출.
+  3. 화살표로 cursor 를 그 영역 쪽으로 이동.
+  4. **파란 하이라이트가 `F` 위치에 그려지는데** (사용자 눈에는 F 가
+     선택된 것처럼 보임) Return 으로 확정하면 사실 picker 는 가려진 `B`
+     를 골라 활성화한다.
+- **관찰된 동작**: 사용자가 시각적으로 지목한 것은 화면에 보이는 `F`
+  지만, picker 가 candidate 로 들고 있던 건 z-order 뒤쪽의 `B`. 결과:
+  잘못된 창이 frontmost 가 됨.
+- **기대 동작**:
+  (a) 가려진 창은 picker candidate 에서 제외되어야 하거나,
+  (b) 파란 하이라이트가 *실제 선택될 wid 의 frame* 으로 그려져야 한다
+      (그러면 가려진 창을 가리킨다는 것이 사용자에게 보임). (a) 가 자연.
+- **원인 추정**:
+  - `FocusWindowManager.reveal()` 의 가시성 필터 (`FocusWindowVisibility
+    .visibleIndices(in:minVisibleRatio:)`, 임계 0.10) 가 occlusion 을
+    잘못 계산해 가려진 창을 visible 로 분류했을 가능성. 또는 `visibleSet`
+    체크는 통과시키되 candidate 의 frame 자체가 가린 창의 frame 과
+    동일하거나 거의 같아 시각적으로 구분 안 되는 케이스.
+  - 같은 frame 의 다른 wid 가 z 상 뒤에 있는 경우 picker 는 둘 다
+    candidate 로 들고 가는데, 화살표 이동 알고리즘이 z 가 뒤쪽인 wid
+    를 먼저 선택하는 경향이 있을 수 있음.
+  - B2 ("Brave 같은 frame 중 좌측 활성화") 와 닮은 메커니즘이지만,
+    이번은 *같은 frame* 이 아니라 *다른 앱이 같은 영역을 덮은* 케이스.
+- **확인 필요**:
+  1. picker 호출 시점의 `[FW] candidate[i]` 로그에서 가려진 창이
+     포함되어 있는지 확인 (포함됐다면 visibility 필터 누락).
+  2. cursor 이동 시 `[FW] move dir=… wid=…` 가 어떤 wid 를 가리키는지
+     화면에 보이는 창의 wid 와 비교.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowManager.swift` (`reveal()` 의 후보
+    수집, 파란 사각형 frame 설정)
+  - `Rectangle/MultiWindow/FocusWindowVisibility.swift` (occlusion 계산)
+- **상태**: 미해결
+- **우선순위**: 미정
