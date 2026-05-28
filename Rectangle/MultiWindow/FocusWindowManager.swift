@@ -15,6 +15,98 @@
 //
 
 import Cocoa
+import Carbon
+
+// MARK: - SkyLight / Process Manager private API (B5)
+//
+// NSRunningApplication.activate() promotes every window of the target app
+// above unrelated apps, which is what produces B5 — picking one Brave window
+// also unburies sibling Brave windows on other displays. The Carbon-era
+// process-manager primitive that the real mouse-click path uses,
+// _SLPSSetFrontProcessWithOptions, can activate a *specific* window without
+// dragging siblings along. Plus a synthesized SLPSPostEventRecordTo pair so
+// Chromium/Electron apps actually treat the targeted window as key.
+//
+// Verified usage:
+//   - yabai (src/window_manager.c:1320, src/misc/extern.h:81)
+//   - alt-tab-macos (Window.swift, SkyLight.framework.swift)
+//
+// These symbols live in SkyLight.framework and are private. If a future macOS
+// release removes them, the dlsym lookup returns nil and we fall back to the
+// public NSRunningApplication.activate path.
+private enum SkyLightPrivate {
+    typealias SLPSSetFrontProcessWithOptions =
+        @convention(c) (UnsafeMutablePointer<ProcessSerialNumber>, UInt32, UInt32) -> OSStatus
+    typealias SLPSPostEventRecordTo =
+        @convention(c) (UnsafeMutablePointer<ProcessSerialNumber>, UnsafeMutablePointer<UInt8>) -> OSStatus
+    // GetProcessForPID is marked unavailable in Swift but the C symbol still
+    // exists in HIServices, so reach it via dlsym.
+    typealias GetProcessForPIDFn =
+        @convention(c) (pid_t, UnsafeMutablePointer<ProcessSerialNumber>) -> OSStatus
+
+    // Mode bits from yabai (src/window_manager.h:88-90).
+    static let kCPSUserGenerated: UInt32 = 0x200
+
+    private static let handle: UnsafeMutableRawPointer? = {
+        // SkyLight is brought in transitively by AppKit; use RTLD_DEFAULT so
+        // we don't pin to a specific framework path that might move.
+        UnsafeMutableRawPointer(bitPattern: -2)  // RTLD_DEFAULT
+    }()
+
+    static let setFrontProcess: SLPSSetFrontProcessWithOptions? = {
+        guard let sym = dlsym(handle, "_SLPSSetFrontProcessWithOptions") else { return nil }
+        return unsafeBitCast(sym, to: SLPSSetFrontProcessWithOptions.self)
+    }()
+
+    static let postEventRecordTo: SLPSPostEventRecordTo? = {
+        guard let sym = dlsym(handle, "SLPSPostEventRecordTo") else { return nil }
+        return unsafeBitCast(sym, to: SLPSPostEventRecordTo.self)
+    }()
+
+    static let getProcessForPID: GetProcessForPIDFn? = {
+        guard let sym = dlsym(handle, "GetProcessForPID") else { return nil }
+        return unsafeBitCast(sym, to: GetProcessForPIDFn.self)
+    }()
+
+    /// Mouse-click-equivalent activation: focuses the given window without
+    /// promoting its sibling windows. Returns false if the private symbols
+    /// aren't available or the OS rejected the call — callers should fall
+    /// back to NSRunningApplication.activate.
+    static func focusWindowLikeClick(pid: pid_t, windowId: UInt32) -> Bool {
+        guard let setFront = setFrontProcess,
+              let postEvent = postEventRecordTo,
+              let getPSN = getProcessForPID else { return false }
+
+        var psn = ProcessSerialNumber()
+        guard getPSN(pid, &psn) == noErr else { return false }
+
+        let status1 = setFront(&psn, windowId, kCPSUserGenerated)
+        if status1 != noErr { return false }
+
+        // Synthesized make-key-window events. Byte layout reverse-engineered
+        // from yabai's window_manager_make_key_window (src/window_manager.c:1269).
+        var bytes = [UInt8](repeating: 0, count: 0xf8)
+        bytes[0x04] = 0xf8
+        bytes[0x3a] = 0x10
+        withUnsafeBytes(of: windowId) { src in
+            for i in 0..<MemoryLayout<UInt32>.size {
+                bytes[0x3c + i] = src[i]
+            }
+        }
+        for i in 0..<0x10 { bytes[0x20 + i] = 0xff }
+
+        bytes[0x08] = 0x01
+        _ = bytes.withUnsafeMutableBufferPointer { buf in
+            postEvent(&psn, buf.baseAddress!)
+        }
+        usleep(40_000)
+        bytes[0x08] = 0x02
+        _ = bytes.withUnsafeMutableBufferPointer { buf in
+            postEvent(&psn, buf.baseAddress!)
+        }
+        return true
+    }
+}
 
 class FocusWindowManager {
 
@@ -143,6 +235,23 @@ class FocusWindowManager {
         NSLog("[FW] confirm: chosen wid=%u pid=%d proc=%@ frame=%@",
               info.id, info.pid, info.processName ?? "?", NSStringFromRect(info.frame))
 
+        // ---- DIAGNOSTIC (B5) ------------------------------------------------
+        // Snapshot the global front-to-back z-order BEFORE we raise/activate.
+        // We log every window (not just the chosen app's) so we can see what
+        // was above/below the chosen app's sibling windows on other displays.
+        // Compared against the post-raise snapshot below, this reveals whether
+        // activate() lifted *all* windows of the chosen app above unrelated
+        // apps that were previously covering them.
+        let preList = WindowUtil.getWindowList().filter { $0.level == 0 }
+        NSLog("[FW] confirm: ---- pre-raise z-order (front→back, level=0) ----")
+        for (i, w) in preList.enumerated() {
+            let samePid = (w.pid == info.pid) ? " [SAME APP]" : ""
+            NSLog("[FW]   z[%d] wid=%u pid=%d proc=%@ frame=%@%@",
+                  i, w.id, w.pid, w.processName ?? "?",
+                  NSStringFromRect(w.frame), samePid)
+        }
+        // ---------------------------------------------------------------------
+
         // First attempt: use the PID we already have.
         let directApp = AccessibilityElement(info.pid)
         let directElements = directApp.windowElements ?? []
@@ -192,15 +301,20 @@ class FocusWindowManager {
             }
         }
 
-        // Order matters here for Chromium/Electron apps (Brave, Chrome, VS Code,
-        // Slack, ...). If we AXRaise *before* activating the app, macOS often
-        // re-promotes the app's last-known-main window during the subsequent
-        // activate, undoing our raise. So: activate first, then AXRaise, then
-        // set AXMain — that order survives Chromium's habit of resetting main
-        // window state.
-        if let runningApp = NSRunningApplication(processIdentifier: resolvedPid) {
+        // Activation. Try the SkyLight private path first — it activates only
+        // the chosen window and leaves sibling windows in their original
+        // z-order, which is what we want for B5. If that fails (private
+        // symbols missing, OS rejected the call), fall back to the public
+        // NSRunningApplication.activate path. That fallback still has the B5
+        // behavior, but it's better than not activating at all.
+        let usedPrivate = SkyLightPrivate.focusWindowLikeClick(pid: resolvedPid,
+                                                               windowId: info.id)
+        if usedPrivate {
+            NSLog("[FW] confirm: activated via SLPS (single-window) pid=%d wid=%u",
+                  resolvedPid, info.id)
+        } else if let runningApp = NSRunningApplication(processIdentifier: resolvedPid) {
             runningApp.activate(options: .activateIgnoringOtherApps)
-            NSLog("[FW] confirm: activated app pid=%d", resolvedPid)
+            NSLog("[FW] confirm: activated via NSRunningApplication (fallback) pid=%d", resolvedPid)
         }
 
         if let target = resolvedTarget {
@@ -210,6 +324,27 @@ class FocusWindowManager {
         } else {
             NSLog("[FW] confirm: gave up — no resolvable AX element. activate only.")
         }
+
+        // ---- DIAGNOSTIC (B5) ------------------------------------------------
+        // Snapshot the global z-order again after activate+raise has settled.
+        // For B5 the smoking gun is: a sibling window of the chosen app sat
+        // mid-stack pre-raise (with other apps' windows above it), and now
+        // sits above those same windows post-raise — i.e. activate() lifted
+        // the whole app group.
+        let intendedId = info.id
+        let intendedPid = info.pid
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            let postList = WindowUtil.getWindowList().filter { $0.level == 0 }
+            NSLog("[FW] confirm: ---- post-raise z-order (front→back, level=0) ----")
+            for (i, w) in postList.enumerated() {
+                let samePid = (w.pid == intendedPid) ? " [SAME APP]" : ""
+                let chosen = (w.id == intendedId) ? " <-- CHOSEN" : ""
+                NSLog("[FW]   z[%d] wid=%u pid=%d proc=%@ frame=%@%@%@",
+                      i, w.id, w.pid, w.processName ?? "?",
+                      NSStringFromRect(w.frame), samePid, chosen)
+            }
+        }
+        // ---------------------------------------------------------------------
     }
 
     private final class Session {
