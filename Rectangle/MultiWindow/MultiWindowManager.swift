@@ -29,9 +29,19 @@ class MultiWindowManager {
             tileActiveAppWindowsOnScreen(windowElement: parameters.windowElement)
             return true
         case .revealStackedWindows:
+            if FocusWindowManager.isActive {
+                NSSound.beep()
+                Logger.log("StackedWindows: focus window picker already active")
+                return true
+            }
             StackedWindowsManager.reveal(windowElement: parameters.windowElement)
             return true
         case .focusWindowPicker:
+            if StackedWindowsManager.isActive {
+                NSSound.beep()
+                Logger.log("FocusWindow: stacked windows picker already active")
+                return true
+            }
             FocusWindowManager.reveal()
             return true
         default:
