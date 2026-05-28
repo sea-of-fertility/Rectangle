@@ -1,0 +1,13 @@
+---
+description: Require a dedicated branch before bug fix work
+alwaysApply: true
+---
+
+# Bug Fix Branching
+
+Before modifying code for any bug fix, create or switch to a dedicated branch for that bug.
+
+- Use a branch name that identifies the bug, such as `fix/window-snap-crash` or `bugfix/macos-15-layout`.
+- Do not fix bugs directly on `main`, `master`, or a shared release branch unless the user explicitly requests it.
+- If the current branch already matches the bug fix work, continue on that branch.
+- If the bug is unclear, clarify the expected behavior and reproduction steps before creating the branch.
