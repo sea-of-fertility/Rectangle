@@ -143,6 +143,23 @@ class FocusWindowManager {
         NSLog("[FW] confirm: chosen wid=%u pid=%d proc=%@ frame=%@",
               info.id, info.pid, info.processName ?? "?", NSStringFromRect(info.frame))
 
+        // ---- DIAGNOSTIC (B5) ------------------------------------------------
+        // Snapshot the global front-to-back z-order BEFORE we raise/activate.
+        // We log every window (not just the chosen app's) so we can see what
+        // was above/below the chosen app's sibling windows on other displays.
+        // Compared against the post-raise snapshot below, this reveals whether
+        // activate() lifted *all* windows of the chosen app above unrelated
+        // apps that were previously covering them.
+        let preList = WindowUtil.getWindowList().filter { $0.level == 0 }
+        NSLog("[FW] confirm: ---- pre-raise z-order (front→back, level=0) ----")
+        for (i, w) in preList.enumerated() {
+            let samePid = (w.pid == info.pid) ? " [SAME APP]" : ""
+            NSLog("[FW]   z[%d] wid=%u pid=%d proc=%@ frame=%@%@",
+                  i, w.id, w.pid, w.processName ?? "?",
+                  NSStringFromRect(w.frame), samePid)
+        }
+        // ---------------------------------------------------------------------
+
         // First attempt: use the PID we already have.
         let directApp = AccessibilityElement(info.pid)
         let directElements = directApp.windowElements ?? []
@@ -210,6 +227,27 @@ class FocusWindowManager {
         } else {
             NSLog("[FW] confirm: gave up — no resolvable AX element. activate only.")
         }
+
+        // ---- DIAGNOSTIC (B5) ------------------------------------------------
+        // Snapshot the global z-order again after activate+raise has settled.
+        // For B5 the smoking gun is: a sibling window of the chosen app sat
+        // mid-stack pre-raise (with other apps' windows above it), and now
+        // sits above those same windows post-raise — i.e. activate() lifted
+        // the whole app group.
+        let intendedId = info.id
+        let intendedPid = info.pid
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            let postList = WindowUtil.getWindowList().filter { $0.level == 0 }
+            NSLog("[FW] confirm: ---- post-raise z-order (front→back, level=0) ----")
+            for (i, w) in postList.enumerated() {
+                let samePid = (w.pid == intendedPid) ? " [SAME APP]" : ""
+                let chosen = (w.id == intendedId) ? " <-- CHOSEN" : ""
+                NSLog("[FW]   z[%d] wid=%u pid=%d proc=%@ frame=%@%@%@",
+                      i, w.id, w.pid, w.processName ?? "?",
+                      NSStringFromRect(w.frame), samePid, chosen)
+            }
+        }
+        // ---------------------------------------------------------------------
     }
 
     private final class Session {
