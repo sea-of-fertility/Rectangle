@@ -284,16 +284,33 @@ class FocusWindowManager {
         }
         // Fall back to a synthetic active entry if the active window didn't
         // survive the visibility/level filters — keeps the picker meaningful
-        // even for odd windows.
+        // even for odd windows. But: if the "active" window is actually
+        // minimized, getFrontWindowElement()'s AX state lags for a few
+        // seconds after the minimize button is clicked, and its wid is
+        // already gone from CGWindowList. The synthetic entry would then
+        // hold the window's last on-screen frame, and the picker would
+        // draw its highlight on empty desktop space (B8 follow-up).
+        // In that case skip the synthetic entry and anchor the cursor on
+        // the first real candidate instead — that's the front-most actual
+        // window from CGWindowList, the natural place to start the picker.
         if activeIndex == -1 {
-            let activeFrameFromAX = active.frame
-            let synthetic = WindowInfo(id: activeWindowId,
-                                       level: 0,
-                                       frame: activeFrameFromAX,
-                                       pid: active.pid ?? 0,
-                                       processName: nil)
-            activeIndex = candidateInfos.count
-            candidateInfos.append(synthetic)
+            if active.isMinimized == true {
+                guard !candidateInfos.isEmpty else {
+                    NSSound.beep()
+                    Logger.log("FocusWindow: active is minimized and no candidates, bail")
+                    return
+                }
+                activeIndex = 0
+            } else {
+                let activeFrameFromAX = active.frame
+                let synthetic = WindowInfo(id: activeWindowId,
+                                           level: 0,
+                                           frame: activeFrameFromAX,
+                                           pid: active.pid ?? 0,
+                                           processName: nil)
+                activeIndex = candidateInfos.count
+                candidateInfos.append(synthetic)
+            }
         }
 
         let session = Session(candidates: candidateInfos,
@@ -314,7 +331,12 @@ class FocusWindowManager {
     /// Brave): they ignore the main-window setter and macOS then restores the
     /// app's most-recent key window, which can sit on a different display
     /// than the one the user picked.
-    fileprivate static func raiseAndActivate(_ info: WindowInfo) {
+    /// Activates the given window. Returns `false` if the chosen window was
+    /// minimized between picker reveal and confirm (B8) — caller should treat
+    /// that like a cancel (restore the previous frontmost app) rather than
+    /// leaving Rectangle frontmost.
+    @discardableResult
+    fileprivate static func raiseAndActivate(_ info: WindowInfo) -> Bool {
         // First attempt: use the PID we already have.
         let directApp = AccessibilityElement(info.pid)
         let directElements = directApp.windowElements ?? []
@@ -349,6 +371,17 @@ class FocusWindowManager {
             }
         }
 
+        // B8: if the chosen window was minimized between reveal() and now
+        // (the picker keeps a static candidate snapshot, so the user can
+        // minimize a candidate via Cmd+M / yellow button while the highlight
+        // is still up), bail. Otherwise the raise/activate sequence below
+        // would pull the window back out of the Dock — the user picked an
+        // "empty rectangle" but a hidden window comes flying out.
+        if resolvedTarget?.isMinimized == true {
+            NSSound.beep()
+            return false  // Caller (Session.confirm) handles previousApp restore.
+        }
+
         // Activation. Try the SkyLight private path first — it activates only
         // the chosen window and leaves sibling windows in their original
         // z-order, which is what we want for B5. If that fails (private
@@ -365,6 +398,7 @@ class FocusWindowManager {
             _ = target.raise()
             target.setMain(true)
         }
+        return true
     }
 
     private final class Session {
@@ -418,7 +452,15 @@ class FocusWindowManager {
             removeKeyMonitor()
             highlight.dismiss()
             let chosen = candidates[cursorIndex]
-            FocusWindowManager.raiseAndActivate(chosen)
+            let activated = FocusWindowManager.raiseAndActivate(chosen)
+            if !activated {
+                // B8 path: chosen window was minimized mid-session, so we
+                // didn't activate anyone. Restore the pre-picker frontmost
+                // app — same as cancel() does — otherwise Rectangle stays
+                // frontmost and the next reveal() bails out at no front
+                // window (B3 regression).
+                previousApp?.activate(options: .activateIgnoringOtherApps)
+            }
             FocusWindowManager.sessionEnded()
         }
 
