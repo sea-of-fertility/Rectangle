@@ -308,7 +308,7 @@
 
 ---
 
-## [ ] B8. Picker 가 떠 있는 동안 candidate 창을 minimize 시키고 Enter 하면 dock 의 그 창이 un-minimize 되며 활성화된다
+## [x] B8. Picker 가 떠 있는 동안 candidate 창을 minimize 시키고 Enter 하면 dock 의 그 창이 un-minimize 되며 활성화된다
 
 - **재현 조건**:
   1. 어떤 창을 dock 에서 꺼내(un-minimize) 활성 상태로 둠.
@@ -350,5 +350,16 @@
   - `Rectangle/MultiWindow/FocusWindowManager.swift`
     (`Session.confirm()`, `raiseAndActivate(_:)`)
   - `Rectangle/AccessibilityElement.swift` (`isMinimized`)
-- **상태**: 미해결
+- **상태**: 해결됨 — 3단 fix.
+  1. `raiseAndActivate` 가 `resolvedTarget.isMinimized == true` 면 beep
+     후 `false` 반환. activate/raise sequence 건너뜀.
+  2. `Session.confirm` 이 `false` 받으면 `previousApp.activate(...)` 로
+     pre-picker frontmost 복원 (cancel 과 동일). 안 그러면 Rectangle 이
+     frontmost 로 남아 다음 reveal 이 B3 와 같은 패턴으로 죽음.
+  3. `reveal()` 의 synthetic-active fallback 가드: minimize 직후엔 AX
+     `getFrontWindowElement()` 가 stale 한 minimize 창을 잠시 반환하고
+     그 wid 는 이미 CGWindowList 에 없어 `activeIndex == -1`. 이때
+     synthetic 을 만들면 stale frame 으로 picker 가 빈 영역을 가리킴.
+     대신 `candidateInfos[0]` (front-most 정상 창) 을 cursor 시작
+     위치로 사용. candidateInfos 가 비어있을 때만 bail.
 - **우선순위**: 미정
