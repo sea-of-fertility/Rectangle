@@ -255,3 +255,45 @@
   - `Rectangle/MultiWindow/FocusWindowVisibility.swift` (occlusion 계산)
 - **상태**: 미해결
 - **우선순위**: 미정
+
+---
+
+## [ ] B7. 모니터 B → C 로 →/← 이동 시 C 모니터의 좌측 창을 건너뛰고 우측 창으로 점프
+
+- **재현 조건**:
+  1. 모니터 A/B/C 가 좌→우로 배열되어 있다.
+  2. 모니터 B 의 어떤 창에서 picker cursor 가 있고 사용자가 `→` 키를 누른다.
+  3. 모니터 C 에 두 창이 있다: 좌측 `Amaranth10` frame `{{0,25},{480,875}}`,
+     우측 `Brave wid=1500` frame `{{480,25},{960,875}}`.
+- **관찰된 동작**: cursor 가 모니터 C 의 *좌측* 창(Amaranth10) 을 건너뛰고
+  바로 *우측* 창(Brave) 으로 점프한다. 사용자가 의도한 "다음 칸" 보다 멀리
+  넘어간다. 대칭적으로 그 반대 방향(`←`)에서는 정상.
+- **기대 동작**: `→` 한 번 누르면 다음 candidate (모니터 C 좌측 Amaranth10)
+  로 한 칸씩 이동.
+- **원인 (코드 검사로 확정)**:
+  - `FocusWindowGeometry.nextWindow(direction:)` 의 quadrant gate:
+    ```swift
+    case .right: inQuadrant = dx > 0 && adx > ady
+    ```
+  - 현재 cursor 가 모니터 B 의 Chrome `{{-1050,-1415},{1280,1415}}`
+    (midY=-707.5) 일 때 `→` 누르면 후보들의 (dx, dy):
+    - Amaranth10: dx=650, dy=1170 → adx(650) < ady(1170) → **quadrant
+      에서 떨어짐**
+    - Brave wid=1500: dx=1370, dy=1170 → adx(1370) > ady(1170) → 통과
+  - 모니터 B 와 C 가 *수직으로도 차이* 가 있는 배치라 Amaranth10 은 우측이
+    아니라 *우상 대각선* 으로 분류된다. `adx > ady` 가 너무 엄격해
+    대각선 후보를 제외, 결과적으로 더 멀리 있는 Brave 가 통과한다.
+- **B6 수정 (visibility 임계 0.30) 과의 관계**: 무관. B6 수정 후 처음
+  눈에 띄었지만 원인은 임계가 아니라 quadrant 알고리즘 자체.
+- **수정 방향 (선택지)**:
+  - **A. quadrant gate 완화** — `adx > ady` → `adx >= ady * 0.5` 등.
+    수평 성분이 1/2 이상이면 우측 후보로 인정. 단순, 직관적. 임계값 튜닝
+    필요.
+  - **B. 두 단계 fallback** — 1차 엄격 quadrant 후보 없으면 2차 완화.
+    회귀 위험 작음.
+  - **C. distance 가중치 변경** — 방향 성분 비례 가중치.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowGeometry.swift`
+    (`nextWindow(from:direction:candidates:)`)
+- **상태**: 미해결
+- **우선순위**: 미정
