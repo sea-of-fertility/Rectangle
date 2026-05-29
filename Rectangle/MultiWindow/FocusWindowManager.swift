@@ -284,21 +284,20 @@ class FocusWindowManager {
         }
         // Fall back to a synthetic active entry if the active window didn't
         // survive the visibility/level filters — keeps the picker meaningful
-        // even for odd windows.
-        // ---- DIAGNOSTIC (B8 follow-up): user reports the picker drawing
-        // on empty desktop space after a minimize bail. Suspect this
-        // synthetic path: getFrontWindowElement() can return a window that
-        // has just been minimized (AX state lags), its wid drops out of
-        // CGWindowList (or out of visibleSet), and we then push a synthetic
-        // entry using the AX frame — which is now stale (Dock-icon coords
-        // or the window's last on-screen rect). Log the active wid/frame,
-        // whether the synthetic path fires, and the final candidate list.
-        NSLog("[FW] reveal: active wid=%u activeFrame=%@ activeIndex=%d",
-              activeWindowId, NSStringFromRect(active.frame), activeIndex)
+        // even for odd windows. But: if the "active" window is actually
+        // minimized, getFrontWindowElement()'s AX state lags for a few
+        // seconds after the minimize button is clicked, and its wid is
+        // already gone from CGWindowList. The synthetic entry would then
+        // hold the window's last on-screen frame, and the picker would
+        // draw its highlight on empty desktop space (B8 follow-up). Bail
+        // in that case so the picker doesn't show a misleading anchor.
         if activeIndex == -1 {
+            if active.isMinimized == true {
+                NSSound.beep()
+                Logger.log("FocusWindow: active window is minimized, bail")
+                return
+            }
             let activeFrameFromAX = active.frame
-            NSLog("[FW] reveal: synthetic entry — active wid not in visibleSet, using AX frame=%@",
-                  NSStringFromRect(activeFrameFromAX))
             let synthetic = WindowInfo(id: activeWindowId,
                                        level: 0,
                                        frame: activeFrameFromAX,
@@ -307,13 +306,6 @@ class FocusWindowManager {
             activeIndex = candidateInfos.count
             candidateInfos.append(synthetic)
         }
-        for (i, info) in candidateInfos.enumerated() {
-            NSLog("[FW]   candidate[%d] wid=%u pid=%d proc=%@ frame=%@%@",
-                  i, info.id, info.pid, info.processName ?? "?",
-                  NSStringFromRect(info.frame),
-                  i == activeIndex ? " (active)" : "")
-        }
-        // --------------------------------------------------------------------
 
         let session = Session(candidates: candidateInfos,
                               startIndex: activeIndex,
