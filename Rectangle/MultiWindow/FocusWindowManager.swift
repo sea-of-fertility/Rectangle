@@ -205,7 +205,7 @@ private enum SkyLightPrivate {
 
 class FocusWindowManager {
 
-    private static let minVisibleRatio: CGFloat = 0.10
+    private static let minVisibleRatio: CGFloat = 0.30
     private static let excludedProcessNames: Set<String> = ["Dock", "WindowManager", "Notification Center", "Window Server"]
     private static let minDimension: CGFloat = 40   // ignore tiny floating chrome
 
