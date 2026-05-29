@@ -285,8 +285,20 @@ class FocusWindowManager {
         // Fall back to a synthetic active entry if the active window didn't
         // survive the visibility/level filters — keeps the picker meaningful
         // even for odd windows.
+        // ---- DIAGNOSTIC (B8 follow-up): user reports the picker drawing
+        // on empty desktop space after a minimize bail. Suspect this
+        // synthetic path: getFrontWindowElement() can return a window that
+        // has just been minimized (AX state lags), its wid drops out of
+        // CGWindowList (or out of visibleSet), and we then push a synthetic
+        // entry using the AX frame — which is now stale (Dock-icon coords
+        // or the window's last on-screen rect). Log the active wid/frame,
+        // whether the synthetic path fires, and the final candidate list.
+        NSLog("[FW] reveal: active wid=%u activeFrame=%@ activeIndex=%d",
+              activeWindowId, NSStringFromRect(active.frame), activeIndex)
         if activeIndex == -1 {
             let activeFrameFromAX = active.frame
+            NSLog("[FW] reveal: synthetic entry — active wid not in visibleSet, using AX frame=%@",
+                  NSStringFromRect(activeFrameFromAX))
             let synthetic = WindowInfo(id: activeWindowId,
                                        level: 0,
                                        frame: activeFrameFromAX,
@@ -295,6 +307,13 @@ class FocusWindowManager {
             activeIndex = candidateInfos.count
             candidateInfos.append(synthetic)
         }
+        for (i, info) in candidateInfos.enumerated() {
+            NSLog("[FW]   candidate[%d] wid=%u pid=%d proc=%@ frame=%@%@",
+                  i, info.id, info.pid, info.processName ?? "?",
+                  NSStringFromRect(info.frame),
+                  i == activeIndex ? " (active)" : "")
+        }
+        // --------------------------------------------------------------------
 
         let session = Session(candidates: candidateInfos,
                               startIndex: activeIndex,
