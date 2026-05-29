@@ -305,3 +305,50 @@
   방향에서 통과 보장 (수학적으로 증명, fix/focus-picker-diagonal-skip
   브랜치 커밋 메시지 참고).
 - **우선순위**: 미정
+
+---
+
+## [ ] B8. Picker 가 떠 있는 동안 candidate 창을 minimize 시키고 Enter 하면 dock 의 그 창이 un-minimize 되며 활성화된다
+
+- **재현 조건**:
+  1. 어떤 창을 dock 에서 꺼내(un-minimize) 활성 상태로 둠.
+  2. Focus Window Picker 호출 — 그 창이 candidate 로 잡힘.
+  3. **확정(Enter) 전에** picker 가 떠 있는 상태에서 그 창을 다시
+     minimize (Cmd+M, 노란 - 버튼 등). picker 의 파란 사각형은
+     캡처된 frame 그대로 화면에 남음.
+  4. **Enter** 로 확정.
+- **관찰된 동작**: picker 가 가리키던 (지금은 minimize 되어 화면에 없는)
+  창이 dock 에서 *un-minimize* 되며 frontmost 로 올라온다. 사용자
+  입장에선 "안 보이는 / 빈 자리의 사각형을 골랐는데 minimize 된 창이
+  꺼내졌다" 로 느낌.
+- **기대 동작**: picker 확정 시점에 chosen 창이 더 이상 visible 이
+  아니면 (minimize 또는 hidden) 동작하지 말고 beep 후 종료하거나,
+  candidate 리스트에서 그 wid 를 제외하고 다음 후보로 이동.
+- **원인 (코드 검사로 확정)**:
+  - `FocusWindowManager.reveal()` 가 candidate 리스트를 *호출 시점*
+    스냅샷으로 잡고 picker session 동안 갱신하지 않는다. session 도중
+    창이 minimize 되어도 picker 의 highlight frame 과 chosen wid 는
+    그대로 유지.
+  - `Session.confirm()` → `raiseAndActivate(chosen)` 는
+    `_SLPSSetFrontProcessWithOptions` + `AXRaise` + `setMain(true)` 를
+    실행. macOS 의 표준 동작상 이 조합은 *minimize 된 창도
+    un-minimize* 시키고 frontmost 로 올린다. dock 의 미니어처를
+    클릭한 것과 같은 효과.
+  - 검증된 로그상 minimize 된 *이후* picker 재호출 시에는 candidate
+    에서 정상적으로 빠짐 (B8 아님). 문제는 picker 가 *이미 떠 있는
+    상태에서* minimize 가 일어난 경우뿐.
+- **수정 방향 (선택지)**:
+  - **A. confirm 시점에 chosen.isMinimized 검사** —
+    `AccessibilityElement.isMinimized == true` 면 beep + 종료, 또는
+    다음 candidate 로 이동. 가장 단순.
+  - **B. session 도중 candidate 변경 감지 + UI 동기화** — AX
+    notification (kAXWindowMiniaturizedNotification) 구독해 picker
+    candidate 에서 즉시 제거 + highlight 재계산. 복잡, race 위험.
+  - **C. 현재 동작 수용 + 설명** — "minimize 된 candidate 를 확정하면
+    꺼낸다" 가 의도된 동작이라고 문서화. 비권장.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowManager.swift`
+    (`Session.confirm()`, `raiseAndActivate(_:)`)
+  - `Rectangle/AccessibilityElement.swift` (`isMinimized`)
+- **상태**: 미해결
+- **우선순위**: 미정
