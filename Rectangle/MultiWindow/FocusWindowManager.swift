@@ -314,7 +314,12 @@ class FocusWindowManager {
     /// Brave): they ignore the main-window setter and macOS then restores the
     /// app's most-recent key window, which can sit on a different display
     /// than the one the user picked.
-    fileprivate static func raiseAndActivate(_ info: WindowInfo) {
+    /// Activates the given window. Returns `false` if the chosen window was
+    /// minimized between picker reveal and confirm (B8) — caller should treat
+    /// that like a cancel (restore the previous frontmost app) rather than
+    /// leaving Rectangle frontmost.
+    @discardableResult
+    fileprivate static func raiseAndActivate(_ info: WindowInfo) -> Bool {
         // First attempt: use the PID we already have.
         let directApp = AccessibilityElement(info.pid)
         let directElements = directApp.windowElements ?? []
@@ -357,7 +362,7 @@ class FocusWindowManager {
         // "empty rectangle" but a hidden window comes flying out.
         if resolvedTarget?.isMinimized == true {
             NSSound.beep()
-            return
+            return false  // Caller (Session.confirm) handles previousApp restore.
         }
 
         // Activation. Try the SkyLight private path first — it activates only
@@ -376,6 +381,7 @@ class FocusWindowManager {
             _ = target.raise()
             target.setMain(true)
         }
+        return true
     }
 
     private final class Session {
@@ -429,7 +435,15 @@ class FocusWindowManager {
             removeKeyMonitor()
             highlight.dismiss()
             let chosen = candidates[cursorIndex]
-            FocusWindowManager.raiseAndActivate(chosen)
+            let activated = FocusWindowManager.raiseAndActivate(chosen)
+            if !activated {
+                // B8 path: chosen window was minimized mid-session, so we
+                // didn't activate anyone. Restore the pre-picker frontmost
+                // app — same as cancel() does — otherwise Rectangle stays
+                // frontmost and the next reveal() bails out at no front
+                // window (B3 regression).
+                previousApp?.activate(options: .activateIgnoringOtherApps)
+            }
             FocusWindowManager.sessionEnded()
         }
 
