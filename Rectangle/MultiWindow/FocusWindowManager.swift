@@ -229,25 +229,10 @@ class FocusWindowManager {
             return app
         }()
 
-        // ---- DIAGNOSTIC (B3 hypothesis A) ----------------------------------
-        // Log who macOS considers frontmost at the moment reveal() starts.
-        // If this is Rectangle itself after a previous cancel, getFrontWindow
-        // Element() will return nil (we have no visible window) and bail.
-        if let front = NSWorkspace.shared.frontmostApplication {
-            NSLog("[FW] reveal: frontmost app pid=%d bundleId=%@ name=%@",
-                  front.processIdentifier,
-                  front.bundleIdentifier ?? "?",
-                  front.localizedName ?? "?")
-        } else {
-            NSLog("[FW] reveal: NSWorkspace.frontmostApplication is nil")
-        }
-        // --------------------------------------------------------------------
-
         // Active window (we anchor the picker here).
         guard let active = AccessibilityElement.getFrontWindowElement(),
               let activeWindowId = active.windowId else {
             NSSound.beep()
-            NSLog("[FW] reveal: no front window — bailing (likely Rectangle is frontmost)")
             Logger.log("FocusWindow: no front window")
             return
         }
@@ -311,17 +296,6 @@ class FocusWindowManager {
             candidateInfos.append(synthetic)
         }
 
-        // ---- DIAGNOSTIC -----------------------------------------------------
-        NSLog("[FW] reveal: active wid=%u pid=%d activeIndex=%d",
-              activeWindowId, active.pid ?? -1, activeIndex)
-        for (i, info) in candidateInfos.enumerated() {
-            NSLog("[FW] candidate[%d] wid=%u pid=%d proc=%@ frame=%@%@",
-                  i, info.id, info.pid, info.processName ?? "?",
-                  NSStringFromRect(info.frame),
-                  i == activeIndex ? " (active)" : "")
-        }
-        // ---------------------------------------------------------------------
-
         let session = Session(candidates: candidateInfos,
                               startIndex: activeIndex,
                               previousApp: previousApp)
@@ -341,37 +315,9 @@ class FocusWindowManager {
     /// app's most-recent key window, which can sit on a different display
     /// than the one the user picked.
     fileprivate static func raiseAndActivate(_ info: WindowInfo) {
-        NSLog("[FW] confirm: chosen wid=%u pid=%d proc=%@ frame=%@",
-              info.id, info.pid, info.processName ?? "?", NSStringFromRect(info.frame))
-
-        // ---- DIAGNOSTIC (B5) ------------------------------------------------
-        // Snapshot the global front-to-back z-order BEFORE we raise/activate.
-        // We log every window (not just the chosen app's) so we can see what
-        // was above/below the chosen app's sibling windows on other displays.
-        // Compared against the post-raise snapshot below, this reveals whether
-        // activate() lifted *all* windows of the chosen app above unrelated
-        // apps that were previously covering them.
-        let preList = WindowUtil.getWindowList().filter { $0.level == 0 }
-        NSLog("[FW] confirm: ---- pre-raise z-order (front→back, level=0) ----")
-        for (i, w) in preList.enumerated() {
-            let samePid = (w.pid == info.pid) ? " [SAME APP]" : ""
-            NSLog("[FW]   z[%d] wid=%u pid=%d proc=%@ frame=%@%@",
-                  i, w.id, w.pid, w.processName ?? "?",
-                  NSStringFromRect(w.frame), samePid)
-        }
-        // ---------------------------------------------------------------------
-
         // First attempt: use the PID we already have.
         let directApp = AccessibilityElement(info.pid)
         let directElements = directApp.windowElements ?? []
-        NSLog("[FW] confirm: directApp(pid=%d) has %d AX windowElements", info.pid, directElements.count)
-        for (i, w) in directElements.enumerated() {
-            NSLog("[FW]   directAxwin[%d] wid=%@ frame=%@ title=%@",
-                  i,
-                  w.windowId.map { "\($0)" } ?? "nil",
-                  NSStringFromRect(w.frame),
-                  w.title ?? "?")
-        }
 
         // If that PID didn't yield any windows (e.g. Chromium helper process),
         // scan every running app and look for the window by id.
@@ -380,19 +326,13 @@ class FocusWindowManager {
 
         if let viaDirect = directElements.first(where: { $0.windowId == info.id }) {
             resolvedTarget = viaDirect
-            NSLog("[FW] confirm: matched directly via PID")
         } else {
-            NSLog("[FW] confirm: direct PID match failed — scanning all running apps for windowId=%u", info.id)
             for runningApp in NSWorkspace.shared.runningApplications {
                 guard runningApp.activationPolicy == .regular || runningApp.activationPolicy == .accessory else { continue }
                 let pid = runningApp.processIdentifier
                 let appElement = AccessibilityElement(pid)
                 guard let windows = appElement.windowElements else { continue }
                 if let match = windows.first(where: { $0.windowId == info.id }) {
-                    NSLog("[FW]   found via scan: pid=%d bundleId=%@ name=%@",
-                          pid,
-                          runningApp.bundleIdentifier ?? "?",
-                          runningApp.localizedName ?? "?")
                     resolvedTarget = match
                     resolvedPid = pid
                     break
@@ -402,7 +342,6 @@ class FocusWindowManager {
 
         // Fallback by frame if still nothing.
         if resolvedTarget == nil {
-            NSLog("[FW] confirm: no AX match by windowId at all — trying frame-based fallback in directApp")
             resolvedTarget = directElements.first { w in
                 let f = w.frame
                 return abs(f.minX - info.frame.minX) < 2 && abs(f.minY - info.frame.minY) < 2
@@ -418,42 +357,14 @@ class FocusWindowManager {
         // behavior, but it's better than not activating at all.
         let usedPrivate = SkyLightPrivate.focusWindowLikeClick(pid: resolvedPid,
                                                                windowId: info.id)
-        if usedPrivate {
-            NSLog("[FW] confirm: activated via SLPS (single-window) pid=%d wid=%u",
-                  resolvedPid, info.id)
-        } else if let runningApp = NSRunningApplication(processIdentifier: resolvedPid) {
+        if !usedPrivate, let runningApp = NSRunningApplication(processIdentifier: resolvedPid) {
             runningApp.activate(options: .activateIgnoringOtherApps)
-            NSLog("[FW] confirm: activated via NSRunningApplication (fallback) pid=%d", resolvedPid)
         }
 
         if let target = resolvedTarget {
-            let raiseOK = target.raise()
+            _ = target.raise()
             target.setMain(true)
-            NSLog("[FW] confirm: AXRaise result=%@ (post-activate)", raiseOK ? "OK" : "FAIL")
-        } else {
-            NSLog("[FW] confirm: gave up — no resolvable AX element. activate only.")
         }
-
-        // ---- DIAGNOSTIC (B5) ------------------------------------------------
-        // Snapshot the global z-order again after activate+raise has settled.
-        // For B5 the smoking gun is: a sibling window of the chosen app sat
-        // mid-stack pre-raise (with other apps' windows above it), and now
-        // sits above those same windows post-raise — i.e. activate() lifted
-        // the whole app group.
-        let intendedId = info.id
-        let intendedPid = info.pid
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            let postList = WindowUtil.getWindowList().filter { $0.level == 0 }
-            NSLog("[FW] confirm: ---- post-raise z-order (front→back, level=0) ----")
-            for (i, w) in postList.enumerated() {
-                let samePid = (w.pid == intendedPid) ? " [SAME APP]" : ""
-                let chosen = (w.id == intendedId) ? " <-- CHOSEN" : ""
-                NSLog("[FW]   z[%d] wid=%u pid=%d proc=%@ frame=%@%@%@",
-                      i, w.id, w.pid, w.processName ?? "?",
-                      NSStringFromRect(w.frame), samePid, chosen)
-            }
-        }
-        // ---------------------------------------------------------------------
     }
 
     private final class Session {
@@ -498,12 +409,6 @@ class FocusWindowManager {
                 let nextFullIndex = others[nextInOthers].idxInFull
                 cursorIndex = nextFullIndex
                 highlight.update(toAXFrame: candidates[nextFullIndex].frame)
-                NSLog("[FW] move dir=%@ → cursorIndex=%d wid=%u proc=%@ frame=%@",
-                      "\(direction)", nextFullIndex, candidates[nextFullIndex].id,
-                      candidates[nextFullIndex].processName ?? "?",
-                      NSStringFromRect(candidates[nextFullIndex].frame))
-            } else {
-                NSLog("[FW] move dir=%@ → no candidate", "\(direction)")
             }
         }
 
@@ -527,20 +432,6 @@ class FocusWindowManager {
             // sees no front window (Rectangle has none) and bails out.
             previousApp?.activate(options: .activateIgnoringOtherApps)
             FocusWindowManager.sessionEnded()
-            // ---- DIAGNOSTIC (B3 hypothesis A) ------------------------------
-            // After cancel, who is frontmost? If Rectangle stays frontmost, the
-            // next reveal() will see itself and bail.
-            DispatchQueue.main.async {
-                if let front = NSWorkspace.shared.frontmostApplication {
-                    NSLog("[FW] cancel: post-cancel frontmost app pid=%d bundleId=%@ name=%@",
-                          front.processIdentifier,
-                          front.bundleIdentifier ?? "?",
-                          front.localizedName ?? "?")
-                } else {
-                    NSLog("[FW] cancel: post-cancel frontmost is nil")
-                }
-            }
-            // ----------------------------------------------------------------
         }
 
         private func installKeyMonitor() {
