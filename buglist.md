@@ -210,7 +210,7 @@
   자동 fallback. 검증: Brave 두 창(모니터 A 가려진 W_A + 모니터 C 보이는 W_C)
   + System Settings 가 W_A 를 덮은 시나리오에서 W_C 확정 후 *post-raise
   z-order 가 W_A 와 System Settings 의 상대 순서를 보존*. 참고:
-  [B5-Investigation.md](B5-Investigation.md).
+  [docs/focus-picker/B5-Investigation.md](docs/focus-picker/B5-Investigation.md).
 - **우선순위**: 미정
 
 ---
