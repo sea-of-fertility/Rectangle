@@ -349,6 +349,17 @@ class FocusWindowManager {
             }
         }
 
+        // B8: if the chosen window was minimized between reveal() and now
+        // (the picker keeps a static candidate snapshot, so the user can
+        // minimize a candidate via Cmd+M / yellow button while the highlight
+        // is still up), bail. Otherwise the raise/activate sequence below
+        // would pull the window back out of the Dock — the user picked an
+        // "empty rectangle" but a hidden window comes flying out.
+        if resolvedTarget?.isMinimized == true {
+            NSSound.beep()
+            return
+        }
+
         // Activation. Try the SkyLight private path first — it activates only
         // the chosen window and leaves sibling windows in their original
         // z-order, which is what we want for B5. If that fails (private
