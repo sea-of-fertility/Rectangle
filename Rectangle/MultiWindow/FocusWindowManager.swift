@@ -139,7 +139,10 @@ private enum SkyLightPrivate {
 
     /// Returns the subset of `ids` that live on one of the currently active
     /// Spaces. If the private API is unavailable, returns the input set
-    /// unchanged (no filtering).
+    /// unchanged (no filtering). In multi-display arrangements with "Displays
+    /// have separate Spaces" enabled every display contributes its own active
+    /// Space, so all visible-on-any-display windows pass through; the filter
+    /// only drops windows that are genuinely on a non-active Space.
     static func filterToCurrentSpace(_ ids: [CGWindowID]) -> Set<CGWindowID> {
         guard let connID = cgsMainConnectionID,
               let copySpaces = copySpacesForWindows,
@@ -152,7 +155,7 @@ private enum SkyLightPrivate {
         var onCurrent = Set<CGWindowID>()
         for wid in ids {
             let result = copySpaces(cid, kCGSAllSpacesMask, [wid] as CFArray)
-            guard let arr = result as? [CGSSpaceID] else { continue }
+            let arr = (result as? [CGSSpaceID]) ?? []
             if arr.contains(where: { activeSpaces.contains($0) }) {
                 onCurrent.insert(wid)
             }
