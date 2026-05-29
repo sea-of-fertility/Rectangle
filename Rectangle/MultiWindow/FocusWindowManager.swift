@@ -289,22 +289,28 @@ class FocusWindowManager {
         // seconds after the minimize button is clicked, and its wid is
         // already gone from CGWindowList. The synthetic entry would then
         // hold the window's last on-screen frame, and the picker would
-        // draw its highlight on empty desktop space (B8 follow-up). Bail
-        // in that case so the picker doesn't show a misleading anchor.
+        // draw its highlight on empty desktop space (B8 follow-up).
+        // In that case skip the synthetic entry and anchor the cursor on
+        // the first real candidate instead — that's the front-most actual
+        // window from CGWindowList, the natural place to start the picker.
         if activeIndex == -1 {
             if active.isMinimized == true {
-                NSSound.beep()
-                Logger.log("FocusWindow: active window is minimized, bail")
-                return
+                guard !candidateInfos.isEmpty else {
+                    NSSound.beep()
+                    Logger.log("FocusWindow: active is minimized and no candidates, bail")
+                    return
+                }
+                activeIndex = 0
+            } else {
+                let activeFrameFromAX = active.frame
+                let synthetic = WindowInfo(id: activeWindowId,
+                                           level: 0,
+                                           frame: activeFrameFromAX,
+                                           pid: active.pid ?? 0,
+                                           processName: nil)
+                activeIndex = candidateInfos.count
+                candidateInfos.append(synthetic)
             }
-            let activeFrameFromAX = active.frame
-            let synthetic = WindowInfo(id: activeWindowId,
-                                       level: 0,
-                                       frame: activeFrameFromAX,
-                                       pid: active.pid ?? 0,
-                                       processName: nil)
-            activeIndex = candidateInfos.count
-            candidateInfos.append(synthetic)
         }
 
         let session = Session(candidates: candidateInfos,
