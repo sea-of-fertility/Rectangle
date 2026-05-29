@@ -215,7 +215,7 @@
 
 ---
 
-## [ ] B6. Picker 의 파란 사각형이 화면에 보이지 않는(다른 창에 가려진) 창을 가리키고 확정 시 그 창이 활성화된다
+## [x] B6. Picker 의 파란 사각형이 화면에 보이지 않는(다른 창에 가려진) 창을 가리키고 확정 시 그 창이 활성화된다
 
 - **재현 조건**:
   1. 화면 어느 영역에 앞쪽 창 `F` (예: Claude 데스크탑 앱) 가 떠 있어 그
@@ -253,7 +253,18 @@
   - `Rectangle/MultiWindow/FocusWindowManager.swift` (`reveal()` 의 후보
     수집, 파란 사각형 frame 설정)
   - `Rectangle/MultiWindow/FocusWindowVisibility.swift` (occlusion 계산)
-- **상태**: 미해결
+- **상태**: 해결됨 — 두 단계 수정.
+  1. **Space 필터 추가**: `SkyLightPrivate.filterToCurrentSpace` 로
+     active Space 에 속하지 않는 wid 를 candidate 에서 제거. 다른
+     Space 의 parking 좌표 (`{{-4890, ...}}` 등) 가 NSScreen union 안에
+     있어 frame intersect 만으론 못 거르던 케이스 해결.
+  2. **visibility 임계 상향**: `FocusWindowManager.minVisibleRatio`
+     0.10 → 0.30. 활성 창이 candidate 의 70% 이상을 덮으면 candidate
+     에서 제외. 사용자 보고의 *Brave 뒤 FortiClient* 시나리오에서
+     FortiClient 가 Brave 에 의해 ~93% 덮였지만 가장자리가 보여 10%
+     임계를 통과하던 false positive 를 차단.
+  관련 커밋: 0399aaa, 02c0798, 8fb01b3, a82ccf8
+  (브랜치 `fix/focus-picker-occluded-window`, 머지 4306af9).
 - **우선순위**: 미정
 
 ---
