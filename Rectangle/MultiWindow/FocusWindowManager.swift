@@ -68,6 +68,101 @@ private enum SkyLightPrivate {
         return unsafeBitCast(sym, to: GetProcessForPIDFn.self)
     }()
 
+    // MARK: Space filter (B6)
+    //
+    // CGWindowList.optionOnScreenOnly returns windows from *other* Spaces too —
+    // macOS parks them at very negative coordinates that still fall inside the
+    // NSScreen union, so a frame-based filter can't exclude them. The picker
+    // cursor can then land on a window that isn't actually on screen.
+    //
+    // The fix is two-step:
+    //   1. Collect every display's *current* active Space ID via
+    //      CGSManagedDisplayGetCurrentSpace.
+    //   2. For each candidate wid, ask CGSCopySpacesForWindows for the Spaces
+    //      it lives on and keep it only if at least one of them is in (1).
+    //
+    // Note: the `mask` argument of CGSCopySpacesForWindows controls the result
+    // *array shape*, not "filter". mask=5/6/7 all return the wid's Space IDs;
+    // a non-empty result does NOT mean "on current Space". We have to compare
+    // explicitly against the active-Space set we built ourselves.
+    //
+    // Verified pattern: alt-tab-macos Spaces.swift (display-keyed active-Space
+    // collection) + Window.swift (per-window Space lookup with mask=all).
+
+    typealias CGSConnectionID = UInt32
+    typealias CGSSpaceID = UInt64
+    typealias CGSMainConnectionIDFn = @convention(c) () -> CGSConnectionID
+    typealias CGSCopySpacesForWindowsFn =
+        @convention(c) (CGSConnectionID, Int32, CFArray) -> CFArray?
+    typealias CGSManagedDisplayGetCurrentSpaceFn =
+        @convention(c) (CGSConnectionID, CFString) -> CGSSpaceID
+
+    static let kCGSAllSpacesMask: Int32 = 7
+
+    static let cgsMainConnectionID: CGSMainConnectionIDFn? = {
+        guard let sym = dlsym(handle, "CGSMainConnectionID") else { return nil }
+        return unsafeBitCast(sym, to: CGSMainConnectionIDFn.self)
+    }()
+
+    static let copySpacesForWindows: CGSCopySpacesForWindowsFn? = {
+        guard let sym = dlsym(handle, "CGSCopySpacesForWindows") else { return nil }
+        return unsafeBitCast(sym, to: CGSCopySpacesForWindowsFn.self)
+    }()
+
+    static let getCurrentSpaceForDisplay: CGSManagedDisplayGetCurrentSpaceFn? = {
+        guard let sym = dlsym(handle, "CGSManagedDisplayGetCurrentSpace") else { return nil }
+        return unsafeBitCast(sym, to: CGSManagedDisplayGetCurrentSpaceFn.self)
+    }()
+
+    /// Returns the set of currently active Space IDs across all connected
+    /// displays. Each display can host its own active Space (multi-Space
+    /// arrangement), so we union them.
+    static func currentSpaceIds() -> Set<CGSSpaceID> {
+        guard let connID = cgsMainConnectionID,
+              let getSpace = getCurrentSpaceForDisplay else { return [] }
+        let cid = connID()
+        var result = Set<CGSSpaceID>()
+        for screen in NSScreen.screens {
+            // NSScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")]
+            // gives the CGDirectDisplayID; CGSManagedDisplayGetCurrentSpace
+            // takes the display *UUID* as CFString.
+            let key = NSDeviceDescriptionKey("NSScreenNumber")
+            guard let nsNum = screen.deviceDescription[key] as? NSNumber else { continue }
+            let displayID = CGDirectDisplayID(nsNum.uint32Value)
+            guard let uuidRef = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { continue }
+            let uuidStr = CFUUIDCreateString(nil, uuidRef)!
+            let spaceId = getSpace(cid, uuidStr as CFString)
+            if spaceId != 0 { result.insert(spaceId) }
+        }
+        return result
+    }
+
+    /// Returns the subset of `ids` that live on one of the currently active
+    /// Spaces. If the private API is unavailable, returns the input set
+    /// unchanged (no filtering). In multi-display arrangements with "Displays
+    /// have separate Spaces" enabled every display contributes its own active
+    /// Space, so all visible-on-any-display windows pass through; the filter
+    /// only drops windows that are genuinely on a non-active Space.
+    static func filterToCurrentSpace(_ ids: [CGWindowID]) -> Set<CGWindowID> {
+        guard let connID = cgsMainConnectionID,
+              let copySpaces = copySpacesForWindows,
+              !ids.isEmpty else {
+            return Set(ids)
+        }
+        let activeSpaces = currentSpaceIds()
+        guard !activeSpaces.isEmpty else { return Set(ids) }
+        let cid = connID()
+        var onCurrent = Set<CGWindowID>()
+        for wid in ids {
+            let result = copySpaces(cid, kCGSAllSpacesMask, [wid] as CFArray)
+            let arr = (result as? [CGSSpaceID]) ?? []
+            if arr.contains(where: { activeSpaces.contains($0) }) {
+                onCurrent.insert(wid)
+            }
+        }
+        return onCurrent
+    }
+
     /// Mouse-click-equivalent activation: focuses the given window without
     /// promoting its sibling windows. Returns false if the private symbols
     /// aren't available or the OS rejected the call — callers should fall
@@ -110,7 +205,7 @@ private enum SkyLightPrivate {
 
 class FocusWindowManager {
 
-    private static let minVisibleRatio: CGFloat = 0.10
+    private static let minVisibleRatio: CGFloat = 0.30
     private static let excludedProcessNames: Set<String> = ["Dock", "WindowManager", "Notification Center", "Window Server"]
     private static let minDimension: CGFloat = 40   // ignore tiny floating chrome
 
@@ -168,13 +263,27 @@ class FocusWindowManager {
             .reduce(CGRect.null) { $0.union($1) }
 
         // All visible windows in front-to-back order, filtered to app-level windows.
-        let allInfos = WindowUtil.getWindowList().filter { info in
+        // Note: the visibleScreensFrame intersection isn't enough on its own —
+        // macOS parks off-Space windows at negative coordinates that still fall
+        // inside the NSScreen union, so we follow with a CGSCopySpacesForWindows
+        // filter below to drop those.
+        let rawInfos = WindowUtil.getWindowList().filter { info in
             info.level == 0
                 && !excludedProcessNames.contains(info.processName ?? "")
                 && info.frame.width >= minDimension
                 && info.frame.height >= minDimension
                 && info.frame.intersects(visibleScreensFrame)
         }
+
+        // B6 fix: keep only windows that live on the *current* Space. Without
+        // this the picker cursor can land on a window that's geometrically in
+        // the NSScreen union but actually on a different Space, so the user
+        // sees the highlight on top of whatever's actually displayed there and
+        // confirm activates a window they never saw.
+        let onCurrent = SkyLightPrivate.filterToCurrentSpace(rawInfos.map { $0.id })
+        let allInfos = rawInfos.filter { onCurrent.contains($0.id) }
+        NSLog("[FW] reveal: space-filter kept %d of %d windows on current Space",
+              allInfos.count, rawInfos.count)
 
         let frames = allInfos.map { $0.frame }
         let visibleSet = FocusWindowVisibility.visibleIndices(in: frames, minVisibleRatio: minVisibleRatio)

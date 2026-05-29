@@ -16,10 +16,16 @@ enum FocusWindowGeometry {
     /// Picks the next window to focus when the user presses a direction key.
     ///
     /// Candidates pass the "quadrant gate" — they must be on the requested side
-    /// of `current` and the dominant axis (|dx| vs |dy|) must match the direction.
-    /// Among passing candidates, the one with the shortest Euclidean midpoint
-    /// distance wins; ties are broken by preferring the upper / leftmost / lower
-    /// index — see `compare(_:_:)`.
+    /// of `current`, and the requested axis must be at least half the magnitude
+    /// of the orthogonal axis. Among passing candidates, the one with the
+    /// shortest Euclidean midpoint distance wins; ties are broken by preferring
+    /// the upper / leftmost / lower index.
+    ///
+    /// The 0.5 axis ratio (vs. a strict > comparison) admits diagonal
+    /// neighbours that are still mostly in the requested direction. The strict
+    /// form silently dropped windows whose horizontal component was real but
+    /// smaller than the vertical component — e.g. monitor B's window seeing
+    /// monitor C's leftmost window across a vertical offset (B7).
     ///
     /// - Returns: index into `candidates`, or nil if no candidate qualifies.
     static func nextWindow(from current: CGRect,
@@ -36,6 +42,7 @@ enum FocusWindowGeometry {
         var scored: [Scored] = []
         let cx = current.midX
         let cy = current.midY
+        let axisRatio: CGFloat = 0.5
 
         for (i, c) in candidates.enumerated() {
             let dx = c.midX - cx
@@ -45,10 +52,10 @@ enum FocusWindowGeometry {
 
             let inQuadrant: Bool
             switch direction {
-            case .left:  inQuadrant = dx < 0 && adx > ady
-            case .right: inQuadrant = dx > 0 && adx > ady
-            case .up:    inQuadrant = dy > 0 && ady > adx
-            case .down:  inQuadrant = dy < 0 && ady > adx
+            case .left:  inQuadrant = dx < 0 && adx >= ady * axisRatio
+            case .right: inQuadrant = dx > 0 && adx >= ady * axisRatio
+            case .up:    inQuadrant = dy > 0 && ady >= adx * axisRatio
+            case .down:  inQuadrant = dy < 0 && ady >= adx * axisRatio
             }
             guard inQuadrant else { continue }
 
