@@ -459,7 +459,7 @@ class FocusWindowManager {
                 // app — same as cancel() does — otherwise Rectangle stays
                 // frontmost and the next reveal() bails out at no front
                 // window (B3 regression).
-                previousApp?.activate(options: .activateIgnoringOtherApps)
+                restorePreviousFrontmost()
             }
             FocusWindowManager.sessionEnded()
         }
@@ -472,8 +472,30 @@ class FocusWindowManager {
             // Restore the app that was frontmost before we showed the picker.
             // Without this, Rectangle stays frontmost and a subsequent reveal()
             // sees no front window (Rectangle has none) and bails out.
-            previousApp?.activate(options: .activateIgnoringOtherApps)
+            restorePreviousFrontmost()
             FocusWindowManager.sessionEnded()
+        }
+
+        /// Hands frontmost back to some other app so Rectangle (which has no
+        /// visible window) doesn't stay topmost. Without this the next
+        /// reveal() would bail at getFrontWindowElement() == nil.
+        ///
+        /// Preferred target: the app that was frontmost when reveal() captured
+        /// `previousApp`. EC1 case: that capture returned nil because
+        /// Rectangle itself was frontmost when picker was invoked (e.g. from
+        /// the Preferences window). In that case fall back to any regular
+        /// running app that isn't us — anything is better than leaving
+        /// Rectangle on top.
+        private func restorePreviousFrontmost() {
+            if let prev = previousApp,
+               prev.activate(options: .activateIgnoringOtherApps) {
+                return
+            }
+            let myPid = getpid()
+            let fallback = NSWorkspace.shared.runningApplications.first {
+                $0.activationPolicy == .regular && $0.processIdentifier != myPid
+            }
+            fallback?.activate(options: .activateIgnoringOtherApps)
         }
 
         private func installKeyMonitor() {
