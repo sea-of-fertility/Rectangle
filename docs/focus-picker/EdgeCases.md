@@ -8,7 +8,7 @@
 
 ---
 
-## EC1. [높음] picker 호출 시점에 Rectangle 자신이 frontmost → previousApp 이 nil → B8/cancel 경로에서 회귀
+## EC1. [해결됨] picker 호출 시점에 Rectangle 자신이 frontmost → previousApp 이 nil → B8/cancel 경로에서 회귀
 
 ### 원인 코드
 
@@ -50,19 +50,30 @@
 - 2번 직후의 *두 번째* picker 호출에서 아무 반응 없음 (beep 만).
 - Console.app: `FocusWindow: no front window` 로그.
 
-### 수정 방향 (참고)
+### 수정
 
-`previousApp?.activate` 가 `nil` 이거나 실패하면 fallback 으로 *임의의
-regular activationPolicy 앱* 하나를 activate. 예:
+`Session` 에 `restorePreviousFrontmost()` 헬퍼 추가. `previousApp?
+.activate` 가 `nil` 이거나 false 면 fallback 으로 *Rectangle 이 아닌
+regular activationPolicy 앱 중 첫 번째* 를 activate. `confirm` 의
+실패 경로와 `cancel` 양쪽에서 호출.
 
 ```swift
-let restored = previousApp?.activate(options: .activateIgnoringOtherApps) ?? false
-if !restored {
-    NSWorkspace.shared.runningApplications
-        .first { $0.activationPolicy == .regular && $0.processIdentifier != getpid() }?
-        .activate(options: .activateIgnoringOtherApps)
+private func restorePreviousFrontmost() {
+    if let prev = previousApp,
+       prev.activate(options: .activateIgnoringOtherApps) {
+        return
+    }
+    let myPid = getpid()
+    NSWorkspace.shared.runningApplications.first {
+        $0.activationPolicy == .regular && $0.processIdentifier != myPid
+    }?.activate(options: .activateIgnoringOtherApps)
 }
 ```
+
+검증: Rectangle 환경설정 창에서 picker → Esc → 재호출 OK. picker →
+candidate minimize → Enter (B8 beep) → 재호출 OK. 일반 케이스 회귀
+없음. 브랜치: `fix/focus-picker-no-previous-app-fallback`, 커밋
+`18b839a`.
 
 ---
 
@@ -316,7 +327,7 @@ let rawInfos = WindowUtil.getWindowList()...
 
 | # | 우선순위 | 핵심 조건 | 영향 |
 |---|---|---|---|
-| EC1 | 높음 | Rectangle 자신이 frontmost 일 때 picker 호출 → cancel/B8 bail | picker 사용 불가 |
+| EC1 | **해결됨** | Rectangle 자신이 frontmost 일 때 picker 호출 → cancel/B8 bail | picker 사용 불가 (fixed) |
 | EC2 | 중간 | 70%+ 가린 다이얼로그 뒤 작업 창 | 그 창 도달 불가 |
 | EC3 | 중간 | Sidecar / 가상 디스플레이 사용 | 그 화면 창 누락 |
 | EC4 | 낮음 | SLPS postEvent 부분 실패 | 잘못된 main window 활성화 |
@@ -324,5 +335,5 @@ let rawInfos = WindowUtil.getWindowList()...
 | EC6 | 낮음 | Stage Manager 환경에서 isMinimized 오보고 | Enter 무반응 |
 | EC7 | 낮음 | 100ms 이내 연속 자동화 호출 | stale candidate |
 
-EC1 만 *일반 사용자가 자연스럽게 만들 수 있는* 시나리오. 우선순위 높음.
+EC1 은 해결됨 (커밋 `18b839a`). 나머지는 특수 환경 / 자동화 / 미검증 가설.
 나머지는 특수 환경 / 미발생 가능성.
