@@ -105,7 +105,7 @@
 
 ---
 
-## [ ] B4. Reveal Stacked Windows로 IntelliJ를 선택하면, 가려진 그 창이 아니라 다른 디스플레이의 IntelliJ가 활성화된다
+## [x] B4. Reveal Stacked Windows로 IntelliJ를 선택하면, 가려진 그 창이 아니라 다른 디스플레이의 IntelliJ가 활성화된다
 
 - **재현 조건**:
   1. 디스플레이 A 에 IntelliJ 창 W_A 가 떠 있다 (현재 화면에 보이는 창의
@@ -152,7 +152,15 @@
   - `Rectangle/MultiWindow/StackedWindowsManager.swift` (onSelection)
   - `Rectangle/AccessibilityElement.swift` (`bringToFront`)
   - `Rectangle/MultiWindow/FocusWindowManager.swift` (`raiseAndActivate` 참고)
-- **상태**: 미해결
+- **상태**: 해결됨 — 수정 방향 A 채택. `StackedWindowsManager.onSelection`
+  의 `bringToFront(force: true)` 호출을 `FocusWindowManager.raiseAndActivate
+  (WindowInfo)` 로 교체. `raiseAndActivate` 의 가시성은 `fileprivate` →
+  `internal` 로 격상. Reveal Stacked Windows 가 picker 와 동일한 활성화
+  시퀀스 (SLPS + AXRaise + setMain + B8 minimize 가드) 를 자동 상속한다.
+  검증: Brave A (picker) → Claude (picker) → Brave B (Reveal) → Cmd+W
+  시나리오에서 Brave B 에 탭이 정상적으로 작동 (fix 이전엔 Brave A 에 탭
+  생성). wid 또는 pid 가 없는 AX element 의 경우 기존 `bringToFront`
+  fallback 유지.
 - **우선순위**: 미정
 
 ---
