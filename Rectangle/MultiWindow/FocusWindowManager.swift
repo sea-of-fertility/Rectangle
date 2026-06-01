@@ -267,8 +267,7 @@ class FocusWindowManager {
         // confirm activates a window they never saw.
         let onCurrent = SkyLightPrivate.filterToCurrentSpace(rawInfos.map { $0.id })
         let allInfos = rawInfos.filter { onCurrent.contains($0.id) }
-        NSLog("[FW] reveal: space-filter kept %d of %d windows on current Space",
-              allInfos.count, rawInfos.count)
+        Logger.log("FocusWindow: space-filter kept \(allInfos.count) of \(rawInfos.count) windows on current Space")
 
         let frames = allInfos.map { $0.frame }
         let visibleSet = FocusWindowVisibility.visibleIndices(in: frames, minVisibleRatio: minVisibleRatio)
