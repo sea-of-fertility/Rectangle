@@ -37,7 +37,7 @@
 
 ---
 
-## [ ] B2. Focus Window Picker로 맨 우측 Brave 창을 선택했는데 제일 좌측 Brave 창이 picker(활성)된다
+## [x] B2. Focus Window Picker로 맨 우측 Brave 창을 선택했는데 제일 좌측 Brave 창이 picker(활성)된다
 
 - **재현 조건**: 같은 앱(Brave Browser)의 창이 여러 개 떠 있는 상태에서
   Focus Window Picker로 **맨 우측의 Brave 창**을 시각적으로 지목/확정.
@@ -61,7 +61,15 @@
 - **확인 필요**: picker 확정 시점의 `[FW] confirm: chosen wid=...` 와
   실제로 활성화된 창의 wid 가 일치하는지 로그로 검증. 일치하지만 보이는 결과가
   다르면 macOS 의 activate 후 promote 문제, 일치 안 하면 매칭 로직 문제.
-- **상태**: 미해결
+- **상태**: 해결됨 — B5 fix (SLPS single-window activation) 의 부수
+  효과로 자연 해결. B2 의 원인 추정 핵심이었던 *`NSRunningApplication
+  .activate(...)` 후 macOS 의 last-known-main 재promote 패턴* 이 B5 fix
+  로 차단됨. `_SLPSSetFrontProcessWithOptions(psn, wid, kCPSUserGenerated)`
+  가 *특정 wid 를* frontmost 로 직접 지정하므로 같은 앱 내 다른 창이
+  promote 될 여지가 없다. 별도 코드 변경 없이 B2 시나리오가 더 이상
+  재현되지 않음을 사용자가 직접 확인. 가능한 잔여 케이스 (예: frame
+  fallback 분기, 같은 frame 의 두 wid 구분) 는 docs/focus-picker/
+  EdgeCases.md EC5 에 별도 기록되어 있음.
 - **우선순위**: 미정
 
 ---
