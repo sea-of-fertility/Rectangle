@@ -76,6 +76,31 @@ See [TerminalCommands.md](TerminalCommands.md)
 * There's an option to have windows traverse across displays on subsequent left or right executions.
 * Windows will snap when dragged to edges/corners of the screen. This can be disabled.
 
+## Multi-window actions
+
+Two actions help you move between windows without the mouse. Both are
+bound to keyboard shortcuts in Preferences > Shortcuts.
+
+### Focus Window Picker
+
+Draws a blue outline around the active window. Use the arrow keys to
+move the focus to a neighboring window — direction is chosen by where
+each candidate's center sits relative to the current selection, not by
+tab order. Press Return to switch to the highlighted window, or Esc to
+cancel and return to whatever was frontmost before. Windows on other
+Spaces or fully covered by other windows are excluded from the
+candidates.
+
+### Reveal Stacked Windows
+
+Shows a HUD listing every window that overlaps the active one — useful
+when several windows sit on top of each other in the same area. Use
+the arrow keys (or Tab) to step through the cards and Return to bring
+that window forward. Esc cancels. The picker activates the chosen
+window with the same precision as Focus Window Picker, so a single
+Chromium / Electron / JetBrains window can be raised without dragging
+its sibling windows along.
+
 ## Common Known Issues
 
 ### Rectangle doesn't have the ability to move to other desktops/spaces
