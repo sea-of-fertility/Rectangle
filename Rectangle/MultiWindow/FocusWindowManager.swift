@@ -336,7 +336,7 @@ class FocusWindowManager {
     /// that like a cancel (restore the previous frontmost app) rather than
     /// leaving Rectangle frontmost.
     @discardableResult
-    fileprivate static func raiseAndActivate(_ info: WindowInfo) -> Bool {
+    static func raiseAndActivate(_ info: WindowInfo) -> Bool {
         // First attempt: use the PID we already have.
         let directApp = AccessibilityElement(info.pid)
         let directElements = directApp.windowElements ?? []

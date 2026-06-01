@@ -82,7 +82,34 @@ class StackedWindowsManager {
                                                 candidates: candidates,
                                                 onScreen: currentScreen)
         picker.onSelection = { selected in
-            selected.bringToFront(force: true)
+            // B4: the old `bringToFront(force: true)` set AXMain and called
+            // app.activate(), but it never invoked AXRaise. On Chromium /
+            // Electron / JetBrains the AXMain setter alone doesn't update
+            // the app's *internal* main-window state, so key events keep
+            // routing to whichever sibling window the app last considered
+            // main. User repro: pick Brave B via Reveal, hit Cmd+W, the
+            // tab opens on Brave A instead.
+            //
+            // FocusWindowManager.raiseAndActivate is the picker's
+            // post-B5/B6/B7/B8 activation sequence: SLPS targets the
+            // specific wid (so sibling windows of the chosen app aren't
+            // dragged along), AXRaise sorts intra-app z-order, setMain
+            // pins the AX-level main. Reusing it here makes Reveal Stacked
+            // Windows share the same activation semantics as the focus
+            // picker.
+            //
+            // Fallback to the old path if we can't construct a WindowInfo
+            // (no wid or pid on the AX element).
+            if let wid = selected.windowId, let pid = selected.pid {
+                let info = WindowInfo(id: wid,
+                                      level: 0,
+                                      frame: selected.frame,
+                                      pid: pid,
+                                      processName: nil)
+                FocusWindowManager.raiseAndActivate(info)
+            } else {
+                selected.bringToFront(force: true)
+            }
         }
         picker.onClose = {
             StackedWindowsManager.activePicker = nil
