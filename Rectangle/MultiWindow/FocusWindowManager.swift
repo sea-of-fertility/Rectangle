@@ -229,12 +229,18 @@ class FocusWindowManager {
             return app
         }()
 
-        // Active window (we anchor the picker here).
-        guard let active = AccessibilityElement.getFrontWindowElement(),
-              let activeWindowId = active.windowId else {
-            NSSound.beep()
-            Logger.log("FocusWindow: no front window")
-            return
+        // Active window (we anchor the picker here). B13: this can be nil —
+        // closing the frontmost app's last window leaves that app frontmost
+        // with *zero* windows, so getFrontWindowElement() has nothing to
+        // return (and right after a close, AX can briefly hand back a dead
+        // element whose windowId is already gone). Instead of bailing, fall
+        // through with nil: CGWindowList below is front-to-back, i.e. MRU
+        // order across all displays, so anchoring the cursor on candidate 0
+        // puts it on the window the user was using *before* the closed one.
+        let active = AccessibilityElement.getFrontWindowElement()
+        let activeWindowId = active?.windowId
+        if activeWindowId == nil {
+            Logger.log("FocusWindow: no front window; anchoring on most-recent candidate (B13)")
         }
 
         // Union of every NSScreen's frame, in CGWindowList (top-origin)
@@ -292,15 +298,11 @@ class FocusWindowManager {
         // In that case skip the synthetic entry and anchor the cursor on
         // the first real candidate instead — that's the front-most actual
         // window from CGWindowList, the natural place to start the picker.
+        // B13 shares that anchor path: with no resolvable front window at
+        // all (last window of the frontmost app was closed), candidate 0 is
+        // the most recently used window that's still on screen.
         if activeIndex == -1 {
-            if active.isMinimized == true {
-                guard !candidateInfos.isEmpty else {
-                    NSSound.beep()
-                    Logger.log("FocusWindow: active is minimized and no candidates, bail")
-                    return
-                }
-                activeIndex = 0
-            } else {
+            if let active, let activeWindowId, active.isMinimized != true {
                 let activeFrameFromAX = active.frame
                 let synthetic = WindowInfo(id: activeWindowId,
                                            level: 0,
@@ -309,6 +311,14 @@ class FocusWindowManager {
                                            processName: nil)
                 activeIndex = candidateInfos.count
                 candidateInfos.append(synthetic)
+            } else {
+                // B8 (active minimized) / B13 (no front window / no wid)
+                guard !candidateInfos.isEmpty else {
+                    NSSound.beep()
+                    Logger.log("FocusWindow: no anchor and no candidates, bail")
+                    return
+                }
+                activeIndex = 0
             }
         }
 
