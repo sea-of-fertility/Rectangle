@@ -15,6 +15,10 @@ enum FocusWindowGeometry {
 
     /// Picks the next window to focus when the user presses a direction key.
     ///
+    /// All rects are in CGWindowList/AX (top-origin) coordinates — y grows
+    /// downward, so "up" means a *smaller* midY. This matches the frames
+    /// FocusWindowManager feeds in from WindowUtil.getWindowList().
+    ///
     /// Candidates pass the "quadrant gate" — they must be on the requested side
     /// of `current`, and the requested axis must be at least half the magnitude
     /// of the orthogonal axis. Among passing candidates, the one with the
@@ -54,8 +58,8 @@ enum FocusWindowGeometry {
             switch direction {
             case .left:  inQuadrant = dx < 0 && adx >= ady * axisRatio
             case .right: inQuadrant = dx > 0 && adx >= ady * axisRatio
-            case .up:    inQuadrant = dy > 0 && ady >= adx * axisRatio
-            case .down:  inQuadrant = dy < 0 && ady >= adx * axisRatio
+            case .up:    inQuadrant = dy < 0 && ady >= adx * axisRatio
+            case .down:  inQuadrant = dy > 0 && ady >= adx * axisRatio
             }
             guard inQuadrant else { continue }
 
@@ -67,7 +71,7 @@ enum FocusWindowGeometry {
 
         scored.sort { a, b in
             if a.distance != b.distance { return a.distance < b.distance }
-            if a.midY != b.midY { return a.midY > b.midY }       // upper first
+            if a.midY != b.midY { return a.midY < b.midY }       // upper first (top-origin: smaller y = higher)
             if a.midX != b.midX { return a.midX < b.midX }       // leftmost first
             return a.index < b.index
         }
