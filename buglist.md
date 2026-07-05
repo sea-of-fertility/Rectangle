@@ -492,3 +492,34 @@
   넘치는 후보는 다음 줄로 wrap. 15개 후보 통합 테스트로 HUD 폭이
   화면 폭 이하임을 검증. 선택 이동(←/→/Tab)은 기존 선형 순서 유지.
 - **우선순위**: 미정
+
+---
+
+## [x] B13. 마지막으로 쓰던 창을 닫으면 Focus Window Picker 가 동작하지 않는다
+
+- **재현 조건**: frontmost 앱의 *마지막* 창을 닫은 직후 picker 호출.
+  (같은 앱에 다른 창이 남아 있거나, 마지막 창과 함께 앱이 종료되는
+  경우는 해당 없음 — 그땐 anchor 가 정상적으로 잡힌다.)
+- **관찰된 동작**: beep 만 나고 picker 가 열리지 않음. macOS 는 창이
+  0개여도 그 앱을 frontmost 로 유지하므로 `getFrontWindowElement()` 가
+  nil 을 반환하고, `reveal()` 진입 가드가 후보 수집 전에 bail.
+  EC1 fallback 은 *닫을 때*(frontmost 복원), B8 fallback 은 *minimized*
+  일 때만 동작해서 이 경로엔 아무 fallback 도 없었다.
+- **기대 동작**: 직전에 쓰던(그 전 최근) 창에 커서를 앵커한 채 picker
+  가 열린다.
+- **해결 방식 (A안)**: 진입 가드를 완화 — front window/wid 를 못 얻어도
+  후보 수집까지 진행하고, `activeIndex == -1` 이면 B8 과 같은 경로로
+  `candidateInfos[0]` 에 앵커. CGWindowList 는 전역(모니터 구분 없는)
+  z-order = MRU 순서이므로 후보 0번이 곧 "닫힌 창 이전에 쓰던 창"이다.
+  듀얼 모니터에서도 모호하지 않음 — 스택이 하나라서 직전 창이 다른
+  모니터에 있으면 그 창이 맨 앞에 온다. 후보가 정말 0개일 때만
+  beep-bail. 부수 효과: `windowId == nil` 인 특수 앱(A4 케이스)도 이제
+  같은 앵커 경로로 picker 가 열린다.
+  (B안 — AX 옵저버로 자체 focus 이력 추적 — 은 상시 옵저버 비용 대비
+  과해서 기각.)
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowManager.swift` (`reveal()`)
+- **상태**: 해결됨 — AX/CGWindowList 의존이라 단위 테스트 불가, 전체
+  스위트 회귀 통과. 수동 검증 필요: 마지막 창 닫기 → hotkey → 직전
+  창에 하이라이트가 앵커되는지.
+- **우선순위**: 미정
