@@ -97,6 +97,13 @@ final class StackedWindowsPickerWindow: NSWindow {
         fatalError("init(coder:) has not been implemented")
     }
 
+    // Borderless windows default to canBecomeKey == false, which would make
+    // makeKeyAndOrderFront() order the HUD without key status and turn the
+    // resignKey() override below into dead code — after Cmd+Tab the picker
+    // would stay up on every Space with Esc no longer reaching it.
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
     // MARK: - Show / dismiss
 
     func show() {
