@@ -420,3 +420,31 @@
   단언 실패(반전 증명)를 확인한 뒤, `.up`/`.down` 게이트 부호와
   tie-break 부등호를 교환. 12/12 통과.
 - **우선순위**: 미정
+
+---
+
+## [x] B10. Stacked Windows picker 가 key window 가 되지 못해 focus 이탈 시 dismiss 가 안 된다
+
+- **재현 조건**: Reveal Stacked Windows HUD 가 뜬 상태에서 Cmd+Tab 으로
+  다른 앱으로 전환 (클릭 없이).
+- **관찰된 동작**: HUD 가 dismiss 되지 않고 화면에 남는다.
+  `canJoinAllSpaces` 라 Space 를 옮겨도 따라다닌다. Rectangle 이
+  비활성이 되어 로컬 키 모니터가 이벤트를 못 받으므로 Esc 도 안 먹고,
+  글로벌 *클릭* 모니터로만 해제 가능. 잔존하는 동안
+  `StackedWindowsManager.isActive == true` 라 B1 의 상호 배타 가드가
+  Focus Window Picker 호출까지 beep 으로 차단한다.
+- **기대 동작**: focus 가 picker 를 떠나면 (다른 창 클릭, Cmd+Tab 등)
+  HUD 가 스스로 닫힌다 — `resignKey()` override 의 원래 의도.
+- **원인**: borderless `NSWindow` 는 기본적으로 `canBecomeKey == false`
+  (실측 확인). `makeKeyAndOrderFront` 가 orderFront 만 수행하고 key 는
+  되지 못해 `resignKey()` override 가 죽은 코드였음. 같은 borderless 인
+  `WindowHighlightWindow` 는 `canBecomeKey` 를 override 해 두어서 focus
+  picker 쪽은 정상이었다.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/StackedWindowsPickerWindow.swift`
+  - `RectangleTests/StackedWindowsOverlapTests.swift`
+    (`StackedWindowsPickerWindowTests`)
+- **상태**: 해결됨 — TDD. `canBecomeKey` 단언 테스트로 false 를 먼저
+  확인한 뒤 `WindowHighlightWindow` 와 동일하게
+  `canBecomeKey = true` / `canBecomeMain = false` override 추가.
+- **우선순위**: 미정

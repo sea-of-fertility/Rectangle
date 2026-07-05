@@ -122,3 +122,20 @@ final class StackedWindowsOverlapTests: XCTestCase {
                                     StackedWindowsManager.overlapThreshold)
     }
 }
+
+// MARK: - Picker window key-ability (B10)
+//
+// Borderless NSWindows return false for canBecomeKey by default, which made
+// the picker's resignKey()-based dismissal dead code: after Cmd+Tab the HUD
+// stayed on screen (across all Spaces) and, via the picker-vs-picker mutual
+// exclusion in MultiWindowManager, blocked the focus picker too.
+final class StackedWindowsPickerWindowTests: XCTestCase {
+
+    func test_pickerWindow_canBecomeKey() throws {
+        let screen = try XCTUnwrap(NSScreen.screens.first)
+        let picker = StackedWindowsPickerWindow(activeWindow: AccessibilityElement(getpid()),
+                                                candidates: [],
+                                                onScreen: screen)
+        XCTAssertTrue(picker.canBecomeKey)
+    }
+}
