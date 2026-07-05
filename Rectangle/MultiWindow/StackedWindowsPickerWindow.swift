@@ -36,6 +36,22 @@ final class StackedWindowsPickerWindow: NSWindow {
     private static let horizontalPadding: CGFloat = 16
     private static let verticalPadding: CGFloat = 16
 
+    /// Pure layout math for the card grid (B12): fit as many card columns as
+    /// `maxContentWidth` allows (at least one) and wrap the rest into rows.
+    /// A maximized active window makes every window on the screen a candidate
+    /// (D-max overlap is 1.0 from the candidate's side), so a single row can
+    /// easily outgrow the display. Internal so the unit tests can exercise
+    /// the boundaries.
+    static func gridLayout(count: Int, maxContentWidth: CGFloat) -> (columns: Int, rows: Int) {
+        let cards = max(count, 1)
+        let cardStride = cardWidth + cardSpacing
+        let available = maxContentWidth - horizontalPadding * 2 + cardSpacing
+        let maxColumns = max(1, Int(available / cardStride))
+        let columns = min(cards, maxColumns)
+        let rows = (cards + columns - 1) / columns
+        return (columns, rows)
+    }
+
     // MARK: - Init
 
     init(activeWindow: AccessibilityElement,
@@ -46,10 +62,14 @@ final class StackedWindowsPickerWindow: NSWindow {
         self.targetScreen = onScreen
 
         let count = max(candidates.count, 1)
-        let contentWidth = CGFloat(count) * Self.cardWidth
-            + CGFloat(count - 1) * Self.cardSpacing
+        let grid = Self.gridLayout(count: count,
+                                   maxContentWidth: onScreen.visibleFrame.width * 0.9)
+        let contentWidth = CGFloat(grid.columns) * Self.cardWidth
+            + CGFloat(grid.columns - 1) * Self.cardSpacing
             + Self.horizontalPadding * 2
-        let contentHeight = Self.cardHeight + Self.verticalPadding * 2
+        let contentHeight = CGFloat(grid.rows) * Self.cardHeight
+            + CGFloat(grid.rows - 1) * Self.cardSpacing
+            + Self.verticalPadding * 2
         let initialRect = NSRect(x: 0, y: 0, width: contentWidth, height: contentHeight)
 
         super.init(contentRect: initialRect, styleMask: .borderless, backing: .buffered, defer: false)
@@ -75,10 +95,14 @@ final class StackedWindowsPickerWindow: NSWindow {
 
         contentView = container
 
-        // Lay out cards horizontally.
-        var x: CGFloat = Self.horizontalPadding
+        // Lay out cards in a grid, top row first (the container view is
+        // non-flipped, so row 0 gets the highest y).
         for (i, w) in candidates.enumerated() {
-            let card = CardView(frame: NSRect(x: x, y: Self.verticalPadding,
+            let row = i / grid.columns
+            let col = i % grid.columns
+            let x = Self.horizontalPadding + CGFloat(col) * (Self.cardWidth + Self.cardSpacing)
+            let y = Self.verticalPadding + CGFloat(grid.rows - 1 - row) * (Self.cardHeight + Self.cardSpacing)
+            let card = CardView(frame: NSRect(x: x, y: y,
                                               width: Self.cardWidth, height: Self.cardHeight))
             card.configure(with: w, indexLabel: i + 1)
             card.onClick = { [weak self] in
@@ -88,7 +112,6 @@ final class StackedWindowsPickerWindow: NSWindow {
             }
             container.addSubview(card)
             cards.append(card)
-            x += Self.cardWidth + Self.cardSpacing
         }
         updateHighlight()
     }

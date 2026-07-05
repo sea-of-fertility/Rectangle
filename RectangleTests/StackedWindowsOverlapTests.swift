@@ -138,4 +138,46 @@ final class StackedWindowsPickerWindowTests: XCTestCase {
                                                 onScreen: screen)
         XCTAssertTrue(picker.canBecomeKey)
     }
+
+    // MARK: - Grid layout (B12)
+    //
+    // Card layout constants: cardWidth 140, cardSpacing 12, horizontalPadding
+    // 16. One row of N cards needs 16*2 + N*140 + (N-1)*12 points, so a
+    // maximized active window with 10+ overlapping candidates used to produce
+    // a HUD wider than the screen with unreachable cards.
+
+    func test_gridLayout_fitsInOneRow_whenWidthAllows() {
+        // 3 cards need 16*2 + 3*140 + 2*12 = 476pt
+        let grid = StackedWindowsPickerWindow.gridLayout(count: 3, maxContentWidth: 1000)
+        XCTAssertEqual(grid.columns, 3)
+        XCTAssertEqual(grid.rows, 1)
+    }
+
+    func test_gridLayout_wrapsIntoRows_whenWidthExceeded() {
+        // maxContentWidth 800 → max columns = (800 - 32 + 12) / 152 = 5
+        let grid = StackedWindowsPickerWindow.gridLayout(count: 12, maxContentWidth: 800)
+        XCTAssertEqual(grid.columns, 5)
+        XCTAssertEqual(grid.rows, 3)
+    }
+
+    func test_gridLayout_neverBelowOneColumn() {
+        let grid = StackedWindowsPickerWindow.gridLayout(count: 4, maxContentWidth: 50)
+        XCTAssertEqual(grid.columns, 1)
+        XCTAssertEqual(grid.rows, 4)
+    }
+
+    func test_gridLayout_zeroCount_isOneByOne() {
+        let grid = StackedWindowsPickerWindow.gridLayout(count: 0, maxContentWidth: 1000)
+        XCTAssertEqual(grid.columns, 1)
+        XCTAssertEqual(grid.rows, 1)
+    }
+
+    func test_pickerWindow_manyCandidates_staysWithinScreenWidth() throws {
+        let screen = try XCTUnwrap(NSScreen.screens.first)
+        let me = AccessibilityElement(getpid())
+        let picker = StackedWindowsPickerWindow(activeWindow: me,
+                                                candidates: Array(repeating: me, count: 15),
+                                                onScreen: screen)
+        XCTAssertLessThanOrEqual(picker.frame.width, screen.visibleFrame.width)
+    }
 }
