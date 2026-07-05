@@ -331,9 +331,9 @@ class FocusWindowManager {
     /// app's most-recent key window, which can sit on a different display
     /// than the one the user picked.
     /// Activates the given window. Returns `false` if the chosen window was
-    /// minimized between picker reveal and confirm (B8) — caller should treat
-    /// that like a cancel (restore the previous frontmost app) rather than
-    /// leaving Rectangle frontmost.
+    /// minimized (B8) or closed (B11) between picker reveal and confirm —
+    /// caller should treat that like a cancel (restore the previous frontmost
+    /// app) rather than leaving Rectangle frontmost.
     @discardableResult
     static func raiseAndActivate(_ info: WindowInfo) -> Bool {
         // First attempt: use the PID we already have.
@@ -376,7 +376,18 @@ class FocusWindowManager {
         // is still up), bail. Otherwise the raise/activate sequence below
         // would pull the window back out of the Dock — the user picked an
         // "empty rectangle" but a hidden window comes flying out.
-        if resolvedTarget?.isMinimized == true {
+        //
+        // B11: same story when the window can't be resolved via AX at all —
+        // it was closed between reveal() and confirm (stale entry from
+        // WindowUtil's 100ms cache, or an auto-closing dialog). Activating
+        // blindly with a dead wid would still front the owning app and pull
+        // an arbitrary sibling window forward.
+        guard let target = resolvedTarget else {
+            NSSound.beep()
+            Logger.log("FocusWindow: chosen wid \(info.id) no longer resolvable via AX (closed?), bail")
+            return false  // Caller (Session.confirm) handles previousApp restore.
+        }
+        if target.isMinimized == true {
             NSSound.beep()
             return false  // Caller (Session.confirm) handles previousApp restore.
         }
@@ -393,10 +404,8 @@ class FocusWindowManager {
             runningApp.activate(options: .activateIgnoringOtherApps)
         }
 
-        if let target = resolvedTarget {
-            _ = target.raise()
-            target.setMain(true)
-        }
+        _ = target.raise()
+        target.setMain(true)
         return true
     }
 
