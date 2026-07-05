@@ -470,3 +470,25 @@
   반환하는 guard 추가. AX 의존이라 단위 테스트 불가, 수동 검증 필요
   (Debug 빌드에서 자동 닫힘 다이얼로그 또는 reveal 직전 창 닫기로 재현).
 - **우선순위**: 미정
+
+---
+
+## [x] B12. Stacked Windows HUD 가 후보가 많으면 화면 폭을 넘어간다
+
+- **재현 조건**: 활성 창이 최대화(또는 화면 대부분 차지) 상태에서
+  Reveal Stacked Windows 호출. D-max overlap 특성상 같은 화면의 거의
+  모든 창이 후보가 되므로 (각 창이 자기 면적의 100% 를 활성 창과 공유)
+  후보 10개 이상이 쉽게 나온다.
+- **관찰된 동작**: 카드 한 줄 폭이 `16*2 + N*140 + (N-1)*12` 로 무제한
+  증가. 10개 = 1,540pt 로 1512pt MacBook 화면 초과. 넘친 카드는 클릭
+  불가, 숫자 단축키는 1–9 까지만, 화살표로 이동하면 하이라이트가 화면
+  밖이라 보이지 않음.
+- **기대 동작**: HUD 가 대상 화면 안에 들어오고 모든 카드가 보인다.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/StackedWindowsPickerWindow.swift` (`gridLayout`)
+  - `RectangleTests/StackedWindowsOverlapTests.swift`
+- **상태**: 해결됨 — TDD. 순수 함수 `gridLayout(count:maxContentWidth:)`
+  를 추출해 화면 visibleFrame 의 90% 를 최대 폭으로 열 수를 계산하고,
+  넘치는 후보는 다음 줄로 wrap. 15개 후보 통합 테스트로 HUD 폭이
+  화면 폭 이하임을 검증. 선택 이동(←/→/Tab)은 기존 선형 순서 유지.
+- **우선순위**: 미정
