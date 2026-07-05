@@ -390,3 +390,33 @@
      대신 `candidateInfos[0]` (front-most 정상 창) 을 cursor 시작
      위치로 사용. candidateInfos 가 비어있을 때만 bail.
 - **우선순위**: 미정
+
+---
+
+## [x] B9. Focus Window Picker 의 ↑/↓ 이동이 상하 반전되어 있다
+
+- **재현 조건**: 활성 창 위/아래에 다른 창이 있는 상태에서 picker 를 열고
+  ↑ 또는 ↓ 를 누른다.
+- **관찰된 동작**: ↑ 를 누르면 시각적으로 *아래* 창이 선택되고, ↓ 를
+  누르면 *위* 창이 선택된다. 해당 방향에 창이 하나뿐이면 반대 키에서만
+  이동하고 기대한 키에서는 무반응.
+- **기대 동작**: ↑ = 위 창, ↓ = 아래 창.
+- **원인**: 좌표계 불일치. `FocusWindowGeometry.nextWindow` 의 사분면
+  게이트가 bottom-origin(Cocoa, y 증가 = 위) 가정으로 작성됨
+  (`.up: dy > 0`). 하지만 런타임에 들어오는 프레임은
+  `WindowUtil.getWindowList()` → `kCGWindowBounds` 의 **top-origin**
+  (y 증가 = 아래) 좌표다 — `reveal()` 이 NSScreen 프레임을
+  `.screenFlipped` 로 뒤집어 창 프레임과 비교하는 것이 그 증거.
+  실측: 화면 맨 위 메뉴바의 CG bounds 가 `y = 0`.
+  단위 테스트도 같은 bottom-origin 가정으로 작성되어 있어서
+  ("macOS 좌표계: y 증가 = 위" 주석) 통과해 왔음. 좌/우는 부호 영향이
+  없어 정상이었고, B7 까지의 수동 테스트가 전부 좌/우 위주라 발견이
+  늦었다. tie-break 의 "upper first" (`midY` 큰 것 우선) 도 같은
+  이유로 실제로는 아래쪽 우선이었음.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowGeometry.swift`
+  - `RectangleTests/FocusWindowGeometryTests.swift`
+- **상태**: 해결됨 — TDD. 테스트를 top-origin 의미로 먼저 교정해 6개
+  단언 실패(반전 증명)를 확인한 뒤, `.up`/`.down` 게이트 부호와
+  tie-break 부등호를 교환. 12/12 통과.
+- **우선순위**: 미정
