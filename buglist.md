@@ -448,3 +448,25 @@
   확인한 뒤 `WindowHighlightWindow` 와 동일하게
   `canBecomeKey = true` / `canBecomeMain = false` override 추가.
 - **우선순위**: 미정
+
+---
+
+## [x] B11. Picker 확정 시점에 이미 닫힌 창을 고르면 엉뚱한 형제 창이 활성화된다
+
+- **재현 조건**: picker 후보 스냅샷에 있던 창이 확정(Enter) 전에
+  닫힌 경우. 세션 중 키 입력은 Rectangle 이 가로채므로 사용자가 직접
+  닫는 경로는 없고, 현실적 경로는 (a) `WindowUtil` 100ms 캐시(EC7)에
+  남은, reveal 직전에 닫힌 창이 후보에 들어간 경우, (b) 자동으로 닫히는
+  다이얼로그/알림 창.
+- **관찰된 동작**: `raiseAndActivate` 의 AX 재해석(resolve)이 전부
+  실패해 `resolvedTarget == nil` 인데도 B8 의 minimized 검사만 통과하고
+  죽은 wid 로 SLPS activate 를 수행 → 소유 앱이 앞으로 나오며 임의의
+  형제 창이 활성화. 반환값도 `true` 라 previousApp 복원 경로도 안 탐.
+- **기대 동작**: B8 (minimized) 과 동일 — beep 후 activate 전체를
+  건너뛰고 `false` 반환, `Session.confirm` 이 pre-picker frontmost 복원.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowManager.swift` (`raiseAndActivate`)
+- **상태**: 해결됨 — `resolvedTarget == nil` 이면 beep + 로그 후 `false`
+  반환하는 guard 추가. AX 의존이라 단위 테스트 불가, 수동 검증 필요
+  (Debug 빌드에서 자동 닫힘 다이얼로그 또는 reveal 직전 창 닫기로 재현).
+- **우선순위**: 미정
