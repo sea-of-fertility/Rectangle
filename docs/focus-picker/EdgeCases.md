@@ -323,6 +323,30 @@ let rawInfos = WindowUtil.getWindowList()...
 
 ---
 
+## EC8. [낮음] `rectangle://` URL 로 picker 호출 시 활성화 경합으로 즉시 자기-취소
+
+### 조건
+
+`open "rectangle://execute-action?name=focus-window-picker"` 같은 URL
+경로로 picker 를 호출하는 경우에만 발생. 전역 단축키 경로는 해당 없음.
+
+### 메커니즘
+
+URL 을 열면 macOS 가 Rectangle 을 활성화하고, URL 핸들러
+(`AppDelegate.application(_:open:)`) 가 이전 frontmost 앱을
+재활성화한다. 이 재활성화가 picker `Session.start()` 의
+`NSApp.activate` 보다 **늦게** 도착하면 하이라이트 창이 key 를 잃고
+resignKey → cancel 로 즉시 닫힌다. 경합이라 간헐적 — 2026-07-07
+자동 E2E 에서 3회 중 2회 즉시 취소, 1회 정상 유지 관측.
+
+### 상태
+
+**기록만**. 실사용 경로(전역 단축키)는 Rectangle 을 활성화하지 않아
+재활성화 코드 자체가 실행되지 않으므로 영향 없음 (B9/B13 hotkey 수동
+검증 통과가 그 증거). URL 로 picker 를 쓸 일이 생기면 그때 재검토.
+
+---
+
 ## 요약
 
 | # | 우선순위 | 핵심 조건 | 영향 |
@@ -334,6 +358,7 @@ let rawInfos = WindowUtil.getWindowList()...
 | EC5 | 낮음 | 같은 midpoint 두 candidate | 화살표로 못 감 (B2 영역) |
 | EC6 | 낮음 | Stage Manager 환경에서 isMinimized 오보고 | Enter 무반응 |
 | EC7 | 낮음 | 100ms 이내 연속 자동화 호출 | stale candidate |
+| EC8 | 낮음 | `rectangle://` URL 로 picker 호출 | 간헐적 즉시 취소 (단축키 경로 무관) |
 
 EC1 은 해결됨 (커밋 `18b839a`). 나머지는 특수 환경 / 자동화 / 미검증 가설.
 나머지는 특수 환경 / 미발생 가능성.
