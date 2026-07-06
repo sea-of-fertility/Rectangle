@@ -529,3 +529,25 @@
   스위트 회귀 통과. 실기 수동 검증 통과 (마지막 창 닫기 → hotkey →
   직전 창에 하이라이트 앵커 확인, 2026-07-06).
 - **우선순위**: 미정
+
+---
+
+## [x] B14. Stacked Windows HUD 가 후보가 아주 많으면 세로로 화면을 넘어간다
+
+- **재현 조건**: B12 의 wrap 도입 후에도 행 수는 무제한이었다. 후보
+  ~40개면 8행 ≈ 880pt 로 작은 화면의 visibleFrame 높이를 초과.
+  (/simplify 설계 깊이 리뷰에서 발견 — B12 가 폭만 제한하고 세로는
+  같은 시나리오가 남아 있었음.)
+- **기대 동작**: HUD 가 양방향 모두 화면 안에 들어온다.
+- **해결 방식**: `gridLayout` 에 `maxContentHeight` 추가 — 행 수를
+  화면이 허용하는 만큼으로 clamp 하고 `capacity`(columns×rows) 를
+  반환. init 은 `candidates.prefix(capacity)` 만 표시 — 잘리는 것은
+  z-order 최하위(가장 깊이 묻힌) 창들이라 손실이 가장 적다. 선택
+  이동/숫자 단축키/카드가 모두 같은 잘린 목록을 인덱싱하도록
+  `self.candidates` 자체를 잘라서 저장. 잘림 발생 시 로그.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/StackedWindowsPickerWindow.swift`
+  - `RectangleTests/StackedWindowsOverlapTests.swift`
+- **상태**: 해결됨 — TDD (시그니처 변경으로 RED 확인 후 구현, 행 clamp
+  /capacity/통합 화면 경계 테스트 3개 추가, 전체 스위트 통과).
+- **우선순위**: 미정

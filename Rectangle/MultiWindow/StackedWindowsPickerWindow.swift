@@ -35,28 +35,33 @@ final class StackedWindowsPickerWindow: NSWindow {
     private static let cardSpacing: CGFloat = 12
     private static let horizontalPadding: CGFloat = 16
     private static let verticalPadding: CGFloat = 16
-    /// Fraction of the target screen's visible width the HUD may occupy.
-    private static let maxScreenWidthFraction: CGFloat = 0.9
+    /// Fraction of the target screen's visible size the HUD may occupy.
+    private static let maxScreenFraction: CGFloat = 0.9
 
     /// Run length of `n` cells including inter-cell spacing (n >= 1).
     private static func extent(_ n: Int, cell: CGFloat) -> CGFloat {
         CGFloat(n) * cell + CGFloat(n - 1) * cardSpacing
     }
 
-    /// Pure layout math for the card grid (B12): fit as many card columns as
-    /// `maxContentWidth` allows (at least one) and wrap the rest into rows.
-    /// A maximized active window makes every window on the screen a candidate
-    /// (D-max overlap is 1.0 from the candidate's side), so a single row can
-    /// easily outgrow the display. Internal so the unit tests can exercise
-    /// the boundaries.
-    static func gridLayout(count: Int, maxContentWidth: CGFloat) -> (columns: Int, rows: Int) {
+    /// Pure layout math for the card grid (B12/B14): fit as many card columns
+    /// as `maxContentWidth` allows (at least one), wrap the rest into rows,
+    /// and cap the rows at what `maxContentHeight` allows. A maximized active
+    /// window makes every window on the screen a candidate (D-max overlap is
+    /// 1.0 from the candidate's side), so extreme counts can outgrow the
+    /// display in either dimension. `capacity` is how many cards fit
+    /// (columns x rows, at most `count`); callers drop candidates beyond it —
+    /// they're the deepest-buried windows in z-order, the least relevant.
+    /// Internal so the unit tests can exercise the boundaries.
+    static func gridLayout(count: Int, maxContentWidth: CGFloat, maxContentHeight: CGFloat)
+        -> (columns: Int, rows: Int, capacity: Int) {
         let cards = max(count, 1)
-        let cardStride = cardWidth + cardSpacing
-        let available = maxContentWidth - horizontalPadding * 2 + cardSpacing
-        let maxColumns = max(1, Int(available / cardStride))
+        let maxColumns = max(1, Int((maxContentWidth - horizontalPadding * 2 + cardSpacing)
+                                    / (cardWidth + cardSpacing)))
+        let maxRows = max(1, Int((maxContentHeight - verticalPadding * 2 + cardSpacing)
+                                 / (cardHeight + cardSpacing)))
         let columns = min(cards, maxColumns)
-        let rows = (cards + columns - 1) / columns
-        return (columns, rows)
+        let rows = min((cards + columns - 1) / columns, maxRows)
+        return (columns, rows, min(count, columns * rows))
     }
 
     // MARK: - Init
@@ -64,12 +69,19 @@ final class StackedWindowsPickerWindow: NSWindow {
     init(activeWindow: AccessibilityElement,
          candidates: [AccessibilityElement],
          onScreen: NSScreen) {
-        self.activeWindow = activeWindow
-        self.candidates = candidates
-        self.targetScreen = onScreen
-
         let grid = Self.gridLayout(count: candidates.count,
-                                   maxContentWidth: onScreen.visibleFrame.width * Self.maxScreenWidthFraction)
+                                   maxContentWidth: onScreen.visibleFrame.width * Self.maxScreenFraction,
+                                   maxContentHeight: onScreen.visibleFrame.height * Self.maxScreenFraction)
+        // B14: keep only what fits — selection, digit shortcuts, and cards
+        // must all index the same (possibly truncated) list.
+        let shownCandidates = Array(candidates.prefix(grid.capacity))
+        if shownCandidates.count < candidates.count {
+            Logger.log("StackedWindows: HUD capacity \(grid.capacity), dropping \(candidates.count - shownCandidates.count) rearmost candidates")
+        }
+
+        self.activeWindow = activeWindow
+        self.candidates = shownCandidates
+        self.targetScreen = onScreen
         let contentWidth = Self.extent(grid.columns, cell: Self.cardWidth) + Self.horizontalPadding * 2
         let contentHeight = Self.extent(grid.rows, cell: Self.cardHeight) + Self.verticalPadding * 2
         let initialRect = NSRect(x: 0, y: 0, width: contentWidth, height: contentHeight)
@@ -99,7 +111,7 @@ final class StackedWindowsPickerWindow: NSWindow {
 
         // Lay out cards in a grid, top row first (the container view is
         // non-flipped, so row 0 gets the highest y).
-        for (i, w) in candidates.enumerated() {
+        for (i, w) in shownCandidates.enumerated() {
             let row = i / grid.columns
             let col = i % grid.columns
             let x = Self.horizontalPadding + CGFloat(col) * (Self.cardWidth + Self.cardSpacing)
