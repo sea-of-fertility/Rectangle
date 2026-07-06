@@ -229,14 +229,9 @@ class FocusWindowManager {
             return app
         }()
 
-        // Active window (we anchor the picker here). B13: this can be nil —
-        // closing the frontmost app's last window leaves that app frontmost
-        // with *zero* windows, so getFrontWindowElement() has nothing to
-        // return (and right after a close, AX can briefly hand back a dead
-        // element whose windowId is already gone). Instead of bailing, fall
-        // through with nil: CGWindowList below is front-to-back, i.e. MRU
-        // order across all displays, so anchoring the cursor on candidate 0
-        // puts it on the window the user was using *before* the closed one.
+        // Active window (we anchor the picker here). B13: nil right after the
+        // frontmost app's last window closes — fall through and anchor on
+        // candidate 0 below (see the activeIndex == -1 fallback).
         let active = AccessibilityElement.getFrontWindowElement()
         let activeWindowId = active?.windowId
         if activeWindowId == nil {
@@ -392,13 +387,9 @@ class FocusWindowManager {
         // WindowUtil's 100ms cache, or an auto-closing dialog). Activating
         // blindly with a dead wid would still front the owning app and pull
         // an arbitrary sibling window forward.
-        guard let target = resolvedTarget else {
+        guard let target = resolvedTarget, target.isMinimized != true else {
             NSSound.beep()
-            Logger.log("FocusWindow: chosen wid \(info.id) no longer resolvable via AX (closed?), bail")
-            return false  // Caller (Session.confirm) handles previousApp restore.
-        }
-        if target.isMinimized == true {
-            NSSound.beep()
+            Logger.log("FocusWindow: chosen wid \(info.id) is minimized or gone from AX, bail")
             return false  // Caller (Session.confirm) handles previousApp restore.
         }
 
