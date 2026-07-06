@@ -418,7 +418,8 @@
   - `RectangleTests/FocusWindowGeometryTests.swift`
 - **상태**: 해결됨 — TDD. 테스트를 top-origin 의미로 먼저 교정해 6개
   단언 실패(반전 증명)를 확인한 뒤, `.up`/`.down` 게이트 부호와
-  tie-break 부등호를 교환. 12/12 통과.
+  tie-break 부등호를 교환. 12/12 통과. 실기 수동 검증 통과
+  (위/아래 배치 창에서 ↑/↓ 방향 확인, 2026-07-06).
 - **우선순위**: 미정
 
 ---
@@ -447,6 +448,9 @@
 - **상태**: 해결됨 — TDD. `canBecomeKey` 단언 테스트로 false 를 먼저
   확인한 뒤 `WindowHighlightWindow` 와 동일하게
   `canBecomeKey = true` / `canBecomeMain = false` override 추가.
+  자동 E2E 검증 통과 (`rectangle://` 로 HUD 트리거 후 Finder 활성화 —
+  클릭이 아니므로 resignKey 경로 — → CGWindowList 재조사에서 HUD 소멸
+  확인, 2026-07-06).
 - **우선순위**: 미정
 
 ---
@@ -491,6 +495,8 @@
   를 추출해 화면 visibleFrame 의 90% 를 최대 폭으로 열 수를 계산하고,
   넘치는 후보는 다음 줄로 wrap. 15개 후보 통합 테스트로 HUD 폭이
   화면 폭 이하임을 검증. 선택 이동(←/→/Tab)은 기존 선형 순서 유지.
+  자동 E2E 검증 통과 (TextEdit 창 12개 + maximize 상태에서 HUD 실측:
+  폭 1692pt ≤ 화면 1920pt, 높이 236pt = 카드 2줄, 2026-07-06).
 - **우선순위**: 미정
 
 ---
@@ -520,6 +526,6 @@
 - **관련 파일**:
   - `Rectangle/MultiWindow/FocusWindowManager.swift` (`reveal()`)
 - **상태**: 해결됨 — AX/CGWindowList 의존이라 단위 테스트 불가, 전체
-  스위트 회귀 통과. 수동 검증 필요: 마지막 창 닫기 → hotkey → 직전
-  창에 하이라이트가 앵커되는지.
+  스위트 회귀 통과. 실기 수동 검증 통과 (마지막 창 닫기 → hotkey →
+  직전 창에 하이라이트 앵커 확인, 2026-07-06).
 - **우선순위**: 미정
