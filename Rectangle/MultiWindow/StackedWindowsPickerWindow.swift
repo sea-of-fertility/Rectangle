@@ -35,6 +35,13 @@ final class StackedWindowsPickerWindow: NSWindow {
     private static let cardSpacing: CGFloat = 12
     private static let horizontalPadding: CGFloat = 16
     private static let verticalPadding: CGFloat = 16
+    /// Fraction of the target screen's visible width the HUD may occupy.
+    private static let maxScreenWidthFraction: CGFloat = 0.9
+
+    /// Run length of `n` cells including inter-cell spacing (n >= 1).
+    private static func extent(_ n: Int, cell: CGFloat) -> CGFloat {
+        CGFloat(n) * cell + CGFloat(n - 1) * cardSpacing
+    }
 
     /// Pure layout math for the card grid (B12): fit as many card columns as
     /// `maxContentWidth` allows (at least one) and wrap the rest into rows.
@@ -61,15 +68,10 @@ final class StackedWindowsPickerWindow: NSWindow {
         self.candidates = candidates
         self.targetScreen = onScreen
 
-        let count = max(candidates.count, 1)
-        let grid = Self.gridLayout(count: count,
-                                   maxContentWidth: onScreen.visibleFrame.width * 0.9)
-        let contentWidth = CGFloat(grid.columns) * Self.cardWidth
-            + CGFloat(grid.columns - 1) * Self.cardSpacing
-            + Self.horizontalPadding * 2
-        let contentHeight = CGFloat(grid.rows) * Self.cardHeight
-            + CGFloat(grid.rows - 1) * Self.cardSpacing
-            + Self.verticalPadding * 2
+        let grid = Self.gridLayout(count: candidates.count,
+                                   maxContentWidth: onScreen.visibleFrame.width * Self.maxScreenWidthFraction)
+        let contentWidth = Self.extent(grid.columns, cell: Self.cardWidth) + Self.horizontalPadding * 2
+        let contentHeight = Self.extent(grid.rows, cell: Self.cardHeight) + Self.verticalPadding * 2
         let initialRect = NSRect(x: 0, y: 0, width: contentWidth, height: contentHeight)
 
         super.init(contentRect: initialRect, styleMask: .borderless, backing: .buffered, defer: false)
