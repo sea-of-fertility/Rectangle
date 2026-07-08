@@ -22,8 +22,10 @@ enum FocusWindowGeometry {
     /// Candidates pass the "quadrant gate" — they must be on the requested side
     /// of `current`, and the requested axis must be at least half the magnitude
     /// of the orthogonal axis. Among passing candidates, the one with the
-    /// shortest Euclidean midpoint distance wins; ties are broken by preferring
-    /// the upper / leftmost / lower index.
+    /// shortest axis-weighted midpoint distance wins — the orthogonal axis
+    /// counts double, so a window straight in the requested direction beats a
+    /// diagonal one at similar Euclidean distance (B15). Ties are broken by
+    /// preferring the upper / leftmost / lower index.
     ///
     /// The 0.5 axis ratio (vs. a strict > comparison) admits diagonal
     /// neighbours that are still mostly in the requested direction. The strict
@@ -63,7 +65,19 @@ enum FocusWindowGeometry {
             }
             guard inQuadrant else { continue }
 
-            let distance = (dx * dx + dy * dy).squareRoot()
+            // B15: rank with the orthogonal axis weighted 2×. Pure Euclidean
+            // distance let a ~43° diagonal window (built-in display, below
+            // left of a portrait monitor) narrowly beat the directly-left
+            // window, breaking → then ← round trips. The gate above still
+            // uses the raw dx/dy, so B7-style diagonal-only candidates stay
+            // reachable.
+            let distance: CGFloat
+            switch direction {
+            case .left, .right:
+                distance = (dx * dx + 4 * dy * dy).squareRoot()
+            case .up, .down:
+                distance = (4 * dx * dx + dy * dy).squareRoot()
+            }
             scored.append(Scored(index: i, distance: distance, midX: c.midX, midY: c.midY))
         }
 

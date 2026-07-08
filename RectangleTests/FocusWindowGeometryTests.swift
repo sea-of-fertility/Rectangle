@@ -93,6 +93,30 @@ final class FocusWindowGeometryTests: XCTestCase {
         XCTAssertEqual(FocusWindowGeometry.nextWindow(from: current, direction: .up, candidates: [upRight, upLeft]), 1)
     }
 
+    func test_b15_left_prefersDirectlyLeftWindowOverNearerDiagonal() {
+        // B15 회귀 — 실제 4-모니터 배치 (top-origin 좌표, 내장 디스플레이가
+        // primary). 세로 모니터의 전체 창에서 ← 를 누르면:
+        //   - 가운데 와이드 창: dx=-2000, dy=+164  → 유클리드 거리 2006.7
+        //   - 내장 디스플레이 창: dx=-1440, dy=+1334 → 유클리드 거리 1962.9
+        // 순수 유클리드 거리로는 ~43° 대각선 아래의 내장 창이 근소하게
+        // 이겨서, → 로 갔다가 ← 로 돌아오면 원래 모니터가 아니라 내장
+        // 디스플레이로 떨어졌다. 직교축 2× 가중으로 "바로 왼쪽" 창이
+        // 이겨야 한다.
+        let portrait = rect(1440, -2164, 1440, 2560) // midX=2160, midY=-884
+        let builtin  = rect(0, 0, 1440, 900)         // midX=720,  midY=450
+        let middle   = rect(-1120, -1440, 2560, 1440) // midX=160, midY=-720
+        let leftmost = rect(-3680, -1440, 2560, 1440) // midX=-2400, midY=-720
+        XCTAssertEqual(FocusWindowGeometry.nextWindow(from: portrait, direction: .left,
+                                                      candidates: [builtin, middle, leftmost]), 1)
+        // 왕복 대칭: 가운데 창에서 → 는 세로 모니터 창으로 (내장 창은
+        // dx=560 < dy*0.5=585 라 gate 에서 탈락, 기존과 동일).
+        XCTAssertEqual(FocusWindowGeometry.nextWindow(from: middle, direction: .right,
+                                                      candidates: [builtin, portrait, leftmost]), 1)
+        // 내장 디스플레이 창은 ← 가 아니라 ↓ 로 도달한다.
+        XCTAssertEqual(FocusWindowGeometry.nextWindow(from: portrait, direction: .down,
+                                                      candidates: [builtin, middle, leftmost]), 0)
+    }
+
     func test_diagonalDominance_belongsToDominantAxis() {
         // 좌측이면서 약간 아래인 후보 (|dx| > |dy|): ← 후보 ✓, ↓ 후보 ✗
         let current = rect(500, 500, 100, 100) // midX=550, midY=550
