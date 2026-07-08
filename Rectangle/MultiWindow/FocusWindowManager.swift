@@ -428,6 +428,7 @@ class FocusWindowManager {
         func start() {
             // candidates is non-empty by construction in reveal() — at minimum
             // it contains the active window itself.
+            Logger.log("FocusWindow: picker anchored on \(describe(candidates[cursorIndex]))")
             highlight.update(toAXFrame: candidates[cursorIndex].frame)
             highlight.onResignKey = { [weak self] in self?.cancel() }
             highlight.makeKeyAndOrderFront(nil)
@@ -450,9 +451,23 @@ class FocusWindowManager {
                                                                   direction: direction,
                                                                   candidates: othersFrames) {
                 let nextFullIndex = others[nextInOthers].idxInFull
+                Logger.log("FocusWindow: move \(direction): \(describe(candidates[cursorIndex])) -> \(describe(candidates[nextFullIndex]))")
                 cursorIndex = nextFullIndex
                 highlight.update(toAXFrame: candidates[nextFullIndex].frame)
+            } else {
+                Logger.log("FocusWindow: move \(direction): \(describe(candidates[cursorIndex])) -> no candidate")
             }
+        }
+
+        /// One-line window description for picker move logs: wid, app,
+        /// screen, and AX (top-origin) frame.
+        private func describe(_ info: WindowInfo) -> String {
+            let screenName = ScreenDetection()
+                .screenContaining(info.frame, screens: NSScreen.screens)?
+                .localizedName ?? "unknown screen"
+            let f = info.frame
+            let frameDesc = "(\(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height)))"
+            return "wid \(info.id) [\(info.processName ?? "?")] on '\(screenName)' \(frameDesc)"
         }
 
         private func confirm() {
@@ -461,6 +476,7 @@ class FocusWindowManager {
             removeKeyMonitor()
             highlight.dismiss()
             let chosen = candidates[cursorIndex]
+            Logger.log("FocusWindow: confirm -> \(describe(chosen))")
             let activated = FocusWindowManager.raiseAndActivate(chosen)
             if !activated {
                 // B8 path: chosen window was minimized mid-session, so we
