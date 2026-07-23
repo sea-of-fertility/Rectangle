@@ -582,3 +582,28 @@
 - **상태**: 해결됨 — TDD (실좌표 회귀 테스트가 수정 전 코드에서 RED
   확인 후 GREEN, 왕복 대칭 + ↓ 도달성 포함, 전체 스위트 통과).
 - **우선순위**: 미정
+
+---
+
+## [x] B16. Focus Window Picker로 다른 디스플레이의 창을 고르면 커서가 이전 화면에 남는다
+
+- **재현 조건**: `moveCursorAcrossDisplays` 설정이 켜진 상태에서, 커서가
+  있는 디스플레이가 아닌 다른 디스플레이의 창을 Focus Window Picker로
+  확정.
+- **관찰된 동작**: 단축키 스냅/리사이즈(`WindowManager.execute` →
+  `windowMovedAcrossDisplays`)는 디스플레이를 넘어갈 때 커서를 새 창
+  중심으로 warp 하지만, `FocusWindowManager.raiseAndActivate` 는 그
+  로직이 없어 창만 활성화되고 커서는 이전 디스플레이에 남는다.
+- **기대 동작**: 단축키 경로와 동일하게, 확정된 창이 커서가 있던
+  디스플레이와 다른 디스플레이에 있으면 소유 앱을 강제 frontmost 하고
+  (`bringToFront(force: true)`), 설정이 켜져 있으면 커서를 그 창
+  중심으로 이동.
+- **해결 방식**: `raiseAndActivate` 끝에서 `ScreenDetection` 으로 확정
+  직전 커서가 있던 화면과 활성화된 창이 실제로 속한 화면을 비교,
+  다르면 `WindowManager.windowMovedAcrossDisplays` 와 동일한 두 동작을
+  수행.
+- **관련 파일**:
+  - `Rectangle/MultiWindow/FocusWindowManager.swift`
+  - `Rectangle/WindowManager.swift` (참조한 기존 로직)
+- **상태**: 해결됨 — 빌드 및 전체 테스트 스위트 통과 확인.
+- **우선순위**: 미정

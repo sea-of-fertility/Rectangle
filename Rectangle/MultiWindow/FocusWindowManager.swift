@@ -407,6 +407,21 @@ class FocusWindowManager {
 
         _ = target.raise()
         target.setMain(true)
+
+        // Match WindowManager.windowMovedAcrossDisplays: when the chosen
+        // window lives on a different display than the one the cursor was
+        // on, force the owning app frontmost and, if the user has opted in,
+        // warp the cursor to the window so it doesn't get left behind on the
+        // old display.
+        let screenDetection = ScreenDetection()
+        let sourceScreen = screenDetection.detectScreensAtCursor()?.currentScreen
+        let destScreen = screenDetection.screenContaining(target.frame, screens: NSScreen.screens)
+        if let sourceScreen, let destScreen, sourceScreen != destScreen {
+            target.bringToFront(force: true)
+            if Defaults.moveCursorAcrossDisplays.userEnabled {
+                CGWarpMouseCursorPosition(target.frame.screenFlipped.centerPoint)
+            }
+        }
         return true
     }
 
