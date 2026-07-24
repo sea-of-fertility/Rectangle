@@ -206,6 +206,7 @@ private enum SkyLightPrivate {
 class FocusWindowManager {
 
     private static let minVisibleRatio: CGFloat = 0.30
+    private static let minVisibleArea: CGFloat = 30_000   // pt², ~300x100 — a clearly visible, clickable chunk
     private static let excludedProcessNames: Set<String> = ["Dock", "WindowManager", "Notification Center", "Window Server"]
     private static let minDimension: CGFloat = 40   // ignore tiny floating chrome
 
@@ -271,7 +272,9 @@ class FocusWindowManager {
         Logger.log("FocusWindow: space-filter kept \(allInfos.count) of \(rawInfos.count) windows on current Space")
 
         let frames = allInfos.map { $0.frame }
-        let visibleSet = FocusWindowVisibility.visibleIndices(in: frames, minVisibleRatio: minVisibleRatio)
+        let visibleSet = FocusWindowVisibility.visibleIndices(in: frames,
+                                                              minVisibleRatio: minVisibleRatio,
+                                                              minVisibleArea: minVisibleArea)
 
         // Build candidates — include the active window too, so the cursor can
         // navigate back to it after moving away. The cursor starts on the

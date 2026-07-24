@@ -12,10 +12,14 @@ import CoreGraphics
 
 enum FocusWindowVisibility {
 
-    /// Returns indices of windows whose visible area / frame area >= `minVisibleRatio`.
+    /// Returns indices of windows whose visible area / frame area >= `minVisibleRatio`,
+    /// OR whose visible area >= `minVisibleArea` (pt²). The absolute-area path
+    /// keeps large windows pickable when they're mostly covered but still show
+    /// a chunk big enough to notice and click — a ratio alone rejects them.
     /// `windows` must be ordered front to back (windows[0] is the topmost).
     static func visibleIndices(in windows: [CGRect],
-                               minVisibleRatio: CGFloat) -> Set<Int> {
+                               minVisibleRatio: CGFloat,
+                               minVisibleArea: CGFloat) -> Set<Int> {
         var result = Set<Int>()
         for i in windows.indices {
             let frame = windows[i]
@@ -24,7 +28,7 @@ enum FocusWindowVisibility {
 
             let covers = Array(windows[..<i])
             let remaining = remainingArea(of: frame, after: covers)
-            if remaining / total >= minVisibleRatio {
+            if remaining / total >= minVisibleRatio || remaining >= minVisibleArea {
                 result.insert(i)
             }
         }

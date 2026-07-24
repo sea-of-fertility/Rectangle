@@ -51,18 +51,18 @@ final class FocusWindowVisibilityTests: XCTestCase {
 
     func test_visibility_singleWindow_alwaysVisible() {
         let w = [rect(0, 0, 200, 200)]
-        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10), [0])
+        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10, minVisibleArea: 30_000), [0])
     }
 
     func test_visibility_twoNonOverlapping_bothVisible() {
         let w = [rect(0, 0, 200, 200), rect(500, 0, 200, 200)]
-        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10), [0, 1])
+        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10, minVisibleArea: 30_000), [0, 1])
     }
 
     func test_visibility_smallWindowFullyCoveredByLargerFront_excluded() {
         // w[0] (front, 큰 창) 이 w[1] (small, 뒤) 을 완전히 덮음
         let w = [rect(0, 0, 500, 500), rect(100, 100, 100, 100)]
-        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10), [0])
+        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10, minVisibleArea: 30_000), [0])
     }
 
     func test_visibility_partiallyCovered_aboveThreshold_included() {
@@ -70,13 +70,36 @@ final class FocusWindowVisibilityTests: XCTestCase {
         let w = [rect(0, 0, 100, 5), rect(0, 0, 100, 100)]
         // w[0] 이 w[1] 위에서 가려진 영역 = (0,0,100,5) ∩ (0,0,100,100) = 500
         // visible = 10000 - 500 = 9500 → 95% > 10%
-        XCTAssertTrue(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10).contains(1))
+        XCTAssertTrue(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10, minVisibleArea: 30_000).contains(1))
     }
 
     func test_visibility_almostFullyCovered_belowThreshold_excluded() {
         // w[0] 이 w[1] 의 95% 가림 → w[1] 은 5% 가시 → 제외
         let w = [rect(0, 0, 100, 95), rect(0, 0, 100, 100)]
-        XCTAssertFalse(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10).contains(1))
+        XCTAssertFalse(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10, minVisibleArea: 30_000).contains(1))
+    }
+
+    // MARK: - absolute-area path (ratio OR area)
+
+    func test_visibility_largeWindowMostlyCovered_passesViaAbsoluteArea() {
+        // 큰 창(3000x1600)의 75% 를 가림 → 비율 25% < 30% 로는 탈락이지만
+        // 남은 가시 면적 1,200,000pt² >= 30,000pt² 이므로 포함되어야 함
+        let w = [rect(0, 0, 3000, 1200), rect(0, 0, 3000, 1600)]
+        XCTAssertTrue(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.30, minVisibleArea: 30_000).contains(1))
+    }
+
+    func test_visibility_smallWindowMostlyCovered_failsBothCriteria() {
+        // 작은 창(200x150 = 30,000pt²)의 75% 를 가림 → 비율 25% < 30%,
+        // 남은 면적 7,500pt² < 30,000pt² → 둘 다 미달, 제외
+        let w = [rect(0, 0, 200, 112.5), rect(0, 0, 200, 150)]
+        XCTAssertFalse(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.30, minVisibleArea: 30_000).contains(1))
+    }
+
+    func test_visibility_ratioPathUnaffected_smallWindowAboveRatio() {
+        // 작은 창(100x100)이 60% 가시 → 면적으로는 미달(6,000pt²)이지만
+        // 비율 60% >= 30% 이므로 기존 비율 경로로 포함 (회귀 없음)
+        let w = [rect(0, 0, 100, 40), rect(0, 0, 100, 100)]
+        XCTAssertTrue(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.30, minVisibleArea: 30_000).contains(1))
     }
 
     func test_visibility_threeStacked_middleCoveredByFront() {
@@ -86,6 +109,6 @@ final class FocusWindowVisibilityTests: XCTestCase {
             rect(0, 0, 100, 100),
             rect(0, 0, 100, 100)
         ]
-        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10), [0])
+        XCTAssertEqual(FocusWindowVisibility.visibleIndices(in: w, minVisibleRatio: 0.10, minVisibleArea: 30_000), [0])
     }
 }
